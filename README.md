@@ -1,20 +1,20 @@
-# New Relic Entity <> CMDB Sync Utility
+# New Relic Entity Tag Sync Utility
 
 [![New Relic Community header](https://opensource.newrelic.com/static/Community_Project-0c3079a4e4dbe2cbd05edc4f8e169d7b.png)](https://opensource.newrelic.com/oss-category/#new-relic-community)
 
-![GitHub forks](https://img.shields.io/github/forks/newrelic/nr-entity-cmdb-sync?style=social)
-![GitHub stars](https://img.shields.io/github/stars/newrelic/nr-entity-cmdb-sync?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/newrelic/nr-entity-cmdb-sync?style=social)
+![GitHub forks](https://img.shields.io/github/forks/newrelic/nr-entity-tag-sync?style=social)
+![GitHub stars](https://img.shields.io/github/stars/newrelic/nr-entity-tag-sync?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/newrelic/nr-entity-tag-sync?style=social)
 
-![GitHub all releases](https://img.shields.io/github/downloads/newrelic/nr-entity-cmdb-sync/total)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/newrelic/nr-entity-cmdb-sync)
-![GitHub last commit](https://img.shields.io/github/last-commit/newrelic/nr-entity-cmdb-sync)
-![GitHub Release Date](https://img.shields.io/github/release-date/newrelic/nr-entity-cmdb-sync)
+![GitHub all releases](https://img.shields.io/github/downloads/newrelic/nr-entity-tag-sync/total)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/newrelic/nr-entity-tag-sync)
+![GitHub last commit](https://img.shields.io/github/last-commit/newrelic/nr-entity-tag-sync)
+![GitHub Release Date](https://img.shields.io/github/release-date/newrelic/nr-entity-tag-sync)
 
-![GitHub issues](https://img.shields.io/github/issues/newrelic/nr-entity-cmdb-sync)
-![GitHub issues closed](https://img.shields.io/github/issues-closed/newrelic/nr-entity-cmdb-sync)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/newrelic/nr-entity-cmdb-sync)
-![GitHub pull requests closed](https://img.shields.io/github/issues-pr-closed/newrelic/nr-entity-cmdb-sync)
+![GitHub issues](https://img.shields.io/github/issues/newrelic/nr-entity-tag-sync)
+![GitHub issues closed](https://img.shields.io/github/issues-closed/newrelic/nr-entity-tag-sync)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/newrelic/nr-entity-tag-sync)
+![GitHub pull requests closed](https://img.shields.io/github/issues-pr-closed/newrelic/nr-entity-tag-sync)
 
 ## Installation
 
