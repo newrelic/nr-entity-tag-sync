@@ -1,0 +1,27 @@
+apiUrl: https://api.newrelic.com
+log:
+  level: warn
+# fileName: trace.log
+provider:
+  type: servicenow
+  apiUrl: https://my-service-now.service-now.com
+  apiUser: admin
+mappings:
+- extEntityQuery:
+    type: cmdb_ci_email_server
+  entityQuery:
+    type:
+    - APPLICATION
+    domain:
+    - APM
+    accountId: 1
+  match:
+    extEntityKey: name
+    operator: equal-ignore-case
+    entityKey: testCmdb
+  mapping:
+    sys_class_name: SNOW_CI_CLASS
+    sys_id: SNOW_CMDB_CI
+    environment: SNOW_ENVIRONMENT
+    sys_domain.value: SNOW_SYS_DOMAIN
+
