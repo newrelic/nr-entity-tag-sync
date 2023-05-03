@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Sample CloudFormation template for deploying the AWS Lambda image.
+
+Parameters:
+  #
+  # URI of the ECR repository.
+  #
+  ImageRepoUri:
+    Type: String
+    Description: URI of the ECR repository.
+  #
+  # ECR image tag.
+  #
+  ImageTag:
+    Type: String
+    Description: ECR image tag.
+    Default: latest
+  #
+  # ARN of the lambda execution role used to execute the lambda.
+  #
+  # Used during deployment.
+  #
+  ExecRoleArn:
+    Type: String
+    Description: ARN of the IAM role used for lambda execution.
+    AllowedPattern: 'arn:(aws[a-zA-Z-]*)?:iam::\d{12}:role/?[a-zA-Z_0-9+=,.@\-_/]+'
+  #
+  # Name of the lambda function.
+  #
+  # Used during deployment.
+  #
+  FunctionName:
+    Type: String
+    Description: Name of the lambda function.
+    Default: NrEntityTagSync
+  #
+  # Timeout (in seconds) for the lambda function.
+  #
+  # Used during deployment.
+  #
+  FunctionTimeout:
+    Type: Number
+    Description: Timeout (in seconds) for the lambda function.
+    MinValue: 1
+    MaxValue: 900
+    Default: 60
+  #
+  # Memory size for the lambda function.
+  #
+  # Used during deployment.
+  #
+  FunctionMemorySize:
+    Type: Number
+    Description: Memory size for the lambda function.
+    MinValue: 128
+    MaxValue: 10240
+    Default: 256
+  #
+  # New Relic license key for the New Relic Go APM agent.
+  #
+  NRLicenseKey:
+    Type: String
+    Description: Your New Relic license key.
+    AllowedPattern: '[a-zA-Z0-9\-_]*'
+    Default: ''
+  #
+  # Log level for the New Relic AWS lambda extension. Defaults to 'INFO'.
+  #
+  # Used at runtime by the New Relic AWS lambda extension.
+  # See https://docs.newrelic.com/docs/serverless-function-monitoring/aws-lambda-monitoring/enable-lambda-monitoring/account-linking/#env-var
+  #
+  NRLogLevel:
+    Type: String
+    Description: Log level for the New Relic Lamba extension.
+    Default: INFO
+    AllowedValues:
+      - INFO
+      - DEBUG
+  #
+  # New Relic User API key used for GraphQL Nerdstorage queries and mutations.
+  #
+  UserApiKey:
+    Type: String
+    Description: The New Relic User API key to use.
+    AllowedPattern: '[a-zA-Z0-9._\-]*'
+    Default: ''
+  #
+  # Service Now API user name used by the Service Now provider.
+  #
+  SnowApiUser:
+    Type: String
+    Description: The Service Now API user.
+    Default: ''
+  #
+  # Service Now API password name used by the Service Now provider.
+  #
+  SnowApiPassword:
+    Type: String
+    Description: The Service Now API password.
+    Default: ''
+
+Resources:
+
+  #
+  # The lambda.
+  #
+
+  NrEntityTagSync:
+    Type: AWS::Lambda::Function
+    Properties:
+      PackageType: Image
+      Code:
+        ImageUri: !Sub ${ImageRepoUri}:${ImageTag}
+      Role: !Sub ${ExecRoleArn}
+      Description: A lambda for syncing tags between external entities and New Relic entities.
+      FunctionName: !Sub ${FunctionName}
+      Timeout: !Ref FunctionTimeout
+      MemorySize: !Ref FunctionMemorySize
+      Environment:
+        Variables:
+          # Lambda environment variables
+          NEW_RELIC_LICENSE_KEY: !Sub ${NRLicenseKey}
+          NEW_RELIC_API_KEY: !Sub ${UserApiKey}
+
+          # Service Now provider variables
+          NR_CMDB_SNOW_APIUSER: !Sub ${SnowApiUser}
+          NR_CMDB_SNOW_APIPASSWORD: !Sub ${SnowApiPassword}

@@ -1,0 +1,4 @@
+FROM public.ecr.aws/lambda/provided:al2
+COPY nr-entity-tag-sync-lambda /main
+COPY configs/config.yml /var/task/configs/config.yml
+ENTRYPOINT [ "/main" ]
