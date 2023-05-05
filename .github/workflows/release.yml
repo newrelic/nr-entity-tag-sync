@@ -14,21 +14,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v3
 
-    - uses: obfu5c8/action-svu
+    - name: Generate new tag
+      uses: obfu5c8/action-svu@v1
       id: generate_next_version
       with:
         force-increment: true
 
     # steps.tag_version.outputs.new_tag
 
-    - run: |
+    - name: Tag latest commit
+      run: |
         git tag ${{ steps.generate_next_version.outputs.version }}
 
     - name: Run GoReleaser
