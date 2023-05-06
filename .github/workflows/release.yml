@@ -28,8 +28,6 @@ jobs:
       with:
         force-increment: true
 
-    # steps.tag_version.outputs.new_tag
-
     - name: Tag latest commit
       run: |
         git tag ${{ steps.generate_next_version.outputs.version }}
@@ -37,6 +35,6 @@ jobs:
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v4
       with:
-        args: release --clean --skip-docker
+        args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

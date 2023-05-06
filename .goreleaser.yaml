@@ -12,35 +12,14 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      #- windows
-      #- darwin
+      - windows
+      - darwin
     goarch:
+      - "386"
       - amd64
-  - id: lambda
-    main: ./cmd/nr-entity-tag-sync-lambda/nr-entity-tag-sync-lambda.go
-    binary: nr-entity-tag-sync-lambda
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-    goarch:
-      - amd64
-
-dockers:
-  - id: lambda-image
-    ids:
-      - lambda
-    image_templates:
-    - "{{ .Env.AWS_ECR_REPO_URI }}:latest"
-    - "{{ .Env.AWS_ECR_REPO_URI }}:{{ .Tag }}"
-    dockerfile: ./deployments/Dockerfile-lambda
-    extra_files:
-    - configs/config.yml
 
 archives:
   - format: tar.gz
-    builds:
-      - standalone
     # this name template makes the OS and Arch compatible with the results of uname.
     name_template: >-
       {{ .ProjectName }}_
@@ -59,14 +38,10 @@ checksum:
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
     exclude:
       - '^docs:'
       - '^test:'
-
-# The lines beneath this are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/use them.
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
