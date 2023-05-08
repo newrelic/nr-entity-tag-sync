@@ -30,5 +30,8 @@ dockers:
     extra_files:
     - configs/config.yml
 
+changelog:
+  skip: true
+
 release:
   disable: true
