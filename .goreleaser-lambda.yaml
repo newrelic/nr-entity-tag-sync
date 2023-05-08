@@ -1,0 +1,31 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+builds:
+  - id: lambda
+    main: ./cmd/nr-entity-tag-sync-lambda/nr-entity-tag-sync-lambda.go
+    binary: nr-entity-tag-sync-lambda
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+dockers:
+  - id: lambda-image
+    ids:
+      - lambda
+    image_templates:
+    - "{{ .Env.AWS_ECR_REPO_URI }}:latest"
+    - "{{ .Env.AWS_ECR_REPO_URI }}:{{ .Tag }}"
+    dockerfile: ./deployments/Dockerfile-lambda
+    extra_files:
+    - configs/config.yml
+
+release:
+  disable: true
