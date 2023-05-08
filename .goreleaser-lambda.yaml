@@ -16,6 +16,9 @@ builds:
     goarch:
       - amd64
 
+archives:
+  - format: binary
+
 dockers:
   - id: lambda-image
     ids:
