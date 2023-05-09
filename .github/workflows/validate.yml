@@ -18,6 +18,10 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v3
 
+    - name: Add GOBIN to PATH
+      run: echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      shell: bash
+
     - name: Install staticcheck
       run: "go install 'honnef.co/go/tools/cmd/staticcheck@latest'"
 
