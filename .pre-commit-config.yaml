@@ -20,9 +20,3 @@ repos:
     - id: go-vet
     - id: go-unit-tests
     - id: go-static-check # install https://staticcheck.io/docs/
-- repo: https://github.com/lumapps/commit-message-validator
-  rev: master
-  hooks:
-    - id: commit-message-validator
-      stages: [commit-msg]
-      args: [--allow-temp]
