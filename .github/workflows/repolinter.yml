@@ -9,6 +9,7 @@ name: Repolinter
 on: [pull_request, workflow_dispatch]
 
 jobs:
+
   repolint:
     name: Run Repolinter
     runs-on: ubuntu-latest
@@ -20,9 +21,11 @@ jobs:
           script: |
             const data = await github.repos.get(context.repo)
             return data.data && data.data.default_branch === context.ref.split('/').slice(-1)[0]
+
       - name: Checkout Self
         if: ${{ steps.default-branch.outputs.result == 'true' }}
         uses: actions/checkout@v2
+
       - name: Run Repolinter
         if: ${{ steps.default-branch.outputs.result == 'true' }}
         uses: newrelic/repolinter-action@v1
