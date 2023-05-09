@@ -7,6 +7,8 @@
 #
 # To enable this hook, rename this file to "pre-commit".
 
+echo Running pre-commit checks...
+
 if git rev-parse --verify HEAD >/dev/null 2>&1
 then
 	against=HEAD
@@ -45,7 +47,19 @@ EOF
 	exit 1
 fi
 
+echo Validating code with go vet...
+go vet ./...
+if [ $? -ne 0 ]; then
+  echo Error: go vet found errors, see output above.
+  exit 1
+fi
+
+echo Validating code with staticcheck...
+staticcheck ./...
+if [ $? -ne 0 ]; then
+  echo Error: staticcheck found errors, see output above.
+  exit 1
+fi
+
 # If there are whitespace errors, print the offending file names and fail.
 exec git diff-index --check --cached $against --
-
-exit 1
