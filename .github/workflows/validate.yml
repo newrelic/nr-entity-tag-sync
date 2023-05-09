@@ -18,6 +18,9 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v3
 
+    - name: Setup Node
+      uses: actions/setup-node@v3
+
     - name: Add GOBIN to PATH
       run: echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
       shell: bash
@@ -27,3 +30,9 @@ jobs:
 
     - name: Run pre-commit
       uses: pre-commit/action@v3.0.0
+
+    - name: Install commitlint
+      run: "npm install -g @commitlint/cli @commitlint/config-conventional"
+
+    - name: Lint last commit message
+      run: "commitlint --from HEAD~1 --to HEAD --verbose"
