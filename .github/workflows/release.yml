@@ -1,0 +1,40 @@
+# This workflow will release a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Release
+
+permissions: write-all
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+
+    - name: Generate new tag
+      uses: obfu5c8/action-svu@v1
+      id: generate_next_version
+      with:
+        force-increment: true
+
+    - name: Tag latest commit
+      run: |
+        git tag ${{ steps.generate_next_version.outputs.version }}
+
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v4
+      with:
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

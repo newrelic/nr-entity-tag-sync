@@ -1,14 +1,15 @@
 # NOTE: This file should always be named `repolinter.yml` to allow
 # workflow_dispatch to work properly
-name: Repolinter Action
+name: Repolinter
 
 # NOTE: This workflow will ONLY check the default branch!
 # Currently there is no elegant way to specify the default
 # branch in the event filtering, so branches are instead
 # filtered in the "Test Default Branch" step.
-on: [push, workflow_dispatch]
+on: [pull_request, workflow_dispatch]
 
 jobs:
+
   repolint:
     name: Run Repolinter
     runs-on: ubuntu-latest
@@ -20,9 +21,11 @@ jobs:
           script: |
             const data = await github.repos.get(context.repo)
             return data.data && data.data.default_branch === context.ref.split('/').slice(-1)[0]
+
       - name: Checkout Self
         if: ${{ steps.default-branch.outputs.result == 'true' }}
         uses: actions/checkout@v2
+
       - name: Run Repolinter
         if: ${{ steps.default-branch.outputs.result == 'true' }}
         uses: newrelic/repolinter-action@v1
