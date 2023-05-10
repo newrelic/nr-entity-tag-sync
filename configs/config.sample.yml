@@ -24,4 +24,3 @@ mappings:
     sys_id: SNOW_CMDB_CI
     environment: SNOW_ENVIRONMENT
     sys_domain.value: SNOW_SYS_DOMAIN
-
