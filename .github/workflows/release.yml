@@ -24,11 +24,17 @@ jobs:
 
     - name: Generate new tag
       uses: obfu5c8/action-svu@v1
-      id: generate_next_version
+      id: install_svu
+      with:
+        type: none
 
     - name: Tag latest commit
       run: |
-        git tag ${{ steps.generate_next_version.outputs.version }}
+        CURR=$(svu c)
+        NEXT=$(svu)
+        if [[ "$NEXT" != "$CURR" ]]; then
+          git tag $NEXT
+        fi
 
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v4
