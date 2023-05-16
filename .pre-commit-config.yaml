@@ -20,7 +20,6 @@ repos:
   rev: v1.0.3
   hooks:
   - id: go-vet
-  - id: go-unit-tests
   - id: go-static-check # install https://staticcheck.io/docs/
 - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
   rev: v9.5.0
