@@ -22,22 +22,27 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
 
-    - name: Generate new tag
+    - name: Set up svu
       uses: obfu5c8/action-svu@v1
       id: install_svu
       with:
         type: none
 
     - name: Tag latest commit
+      id: tag-commit
       run: |
         CURR=$(svu c)
         NEXT=$(svu)
         if [[ "$NEXT" != "$CURR" ]]; then
           git tag $NEXT
+          echo "next-version=$NEXT" >> "$GITHUB_OUTPUT"
+        else
+          echo "next-version=" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v4
+      if: steps.tag-commit.outputs.next-version != ''
       with:
         args: release --clean
       env:
