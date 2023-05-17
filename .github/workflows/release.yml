@@ -32,11 +32,11 @@ jobs:
       run: |
         CURR=$(svu c)
         NEXT=$(svu)
-        if [[ "$NEXT" == "$CURR" ]]; then
+        if [[ "$NEXT" != "$CURR" ]]; then
           git tag $NEXT
           echo "next-version=$NEXT" >> "$GITHUB_OUTPUT"
         else
-          echo "next-version=" >> "$GITHUB_OUTPUT"
+          echo "next-version=12345" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Run GoReleaser
