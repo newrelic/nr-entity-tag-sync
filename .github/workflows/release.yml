@@ -32,7 +32,7 @@ jobs:
       run: |
         CURR=$(svu c)
         NEXT=$(svu)
-        if [[ "$NEXT" != "$CURR" ]]; then
+        if [[ "$NEXT" == "$CURR" ]]; then
           git tag $NEXT
           echo "next-version=$NEXT" >> "$GITHUB_OUTPUT"
         else
