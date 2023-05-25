@@ -3,6 +3,7 @@ package servicenow
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/newrelic/nr-entity-tag-sync/internal/provider"
 	"github.com/newrelic/nr-entity-tag-sync/pkg/interop"
@@ -56,8 +57,9 @@ func New(i *interop.Interop, v *viper.Viper) (provider.Provider, error) {
 }
 
 func (snp *ServiceNowProvider) GetEntities(
-  config map[string]interface{},
-  tags []string,
+  config            map[string]interface{},
+  tags              []string,
+  lastSyncchan      time.Time,
 ) (
   []provider.Entity,
   error,

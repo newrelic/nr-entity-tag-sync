@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/newrelic/nr-entity-tag-sync/pkg/interop"
 	"github.com/spf13/viper"
@@ -14,7 +15,11 @@ type Entity struct {
 }
 
 type Provider interface {
-  GetEntities(config map[string]interface{}, tags []string) ([]Entity, error)
+  GetEntities(
+    config          map[string]interface{},
+    tags            []string,
+    lastSync        time.Time,
+  ) ([]Entity, error)
 }
 
 type InitFn func (*interop.Interop, *viper.Viper) (Provider, error)

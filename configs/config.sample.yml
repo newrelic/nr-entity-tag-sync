@@ -1,7 +1,12 @@
-apiUrl: https://api.newrelic.com
+apiKey: XXXXXX
+licenseKey: XXXXXX
+region: US
 log:
   level: warn
-# fileName: trace.log
+  fileName: trace.log
+events:
+  enabled: true
+  accountId: 12345
 provider:
   type: servicenow
   apiUrl: https://my-service-now.service-now.com
