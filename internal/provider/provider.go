@@ -18,7 +18,7 @@ type Provider interface {
   GetEntities(
     config          map[string]interface{},
     tags            []string,
-    lastSync        time.Time,
+    lastUpdate      *time.Time,
   ) ([]Entity, error)
 }
 

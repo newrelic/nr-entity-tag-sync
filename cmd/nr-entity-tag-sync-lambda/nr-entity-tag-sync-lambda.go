@@ -27,7 +27,7 @@ func HandleRequest(ctx context.Context) (TagSyncResult, error) {
 
   syncer, err := sync.New(i)
   if err != nil {
-    retErr := fmt.Errorf("sync failed: %s", err)
+    retErr := fmt.Errorf("failed to create syncer: %s", err)
     return TagSyncResult{false, retErr}, retErr
   }
 

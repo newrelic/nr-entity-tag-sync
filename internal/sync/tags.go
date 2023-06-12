@@ -19,7 +19,6 @@ func updateTags(
   tagChanges := 0
   tagsToDelete := []string{}
   tagsToAdd := []entities.TaggingTagInput{}
-  tagsToUpdate := []entities.TaggingTagInput{}
 
   for extEntityKeyName, entityTagName := range mapping {
     extEntityKeyValue, extEntityKeyExists := getExtEntityKeyValue(
@@ -53,25 +52,29 @@ func updateTags(
         )
         tagChanges += 1
       } else if !stringSliceContains(entityTagValues, extEntityKeyValue){
-        // entity key - yes, tag values contain ext entity value - no, replace
+        // entity key - yes, tag values contain ext entity value - no, update
         for _, tag := range entity.Tags {
           if tag.Key == entityTagName {
-            values := tag.Values
-            values = append(values, extEntityKeyValue)
-            tagsToUpdate = append(
-              tagsToUpdate,
+            tagsToDelete = append(tagsToDelete, entityTagName)
+
+            // TODO: This is destructive. If the New Relic tag has multiple
+            // values and the external entity key is not in those values, we
+            // end up removing _all_ the other values for the New Relic tag
+            // and add it back just with the one value from the external entity.
+            // In other words, it's a replace. Is there a non-destructive
+            // solution?
+            //vals := make([]string, len(tag.Values))
+            //copy(vals, tag.Values)
+
+            tagsToAdd = append(
+              tagsToAdd,
               entities.TaggingTagInput{
-                Key: tag.Key,
-                Values: values,
+                Key: entityTagName,
+                Values: []string{extEntityKeyValue},
               },
             )
             continue
           }
-
-          tagsToUpdate = append(
-            tagsToUpdate,
-            entities.TaggingTagInput(tag),
-          )
         }
         tagChanges += 1
       }
@@ -87,7 +90,6 @@ func updateTags(
     entity,
     tagsToDelete,
     tagsToAdd,
-    tagsToUpdate,
   )
 
   if len(errors) > 0 {
@@ -102,7 +104,6 @@ func applyUpdates(
   entity            *EntityOutline,
   tagsToDelete      []string,
   tagsToAdd         []entities.TaggingTagInput,
-  tagsToUpdate      []entities.TaggingTagInput,
 ) []error {
   nrClient := i.NrClient
   errors := []error{}
@@ -155,34 +156,6 @@ func applyUpdates(
         errors,
         fmt.Errorf(
           "adding tags on entity %s (%s) failed: %s",
-          entity.Name,
-          entity.Guid,
-          buildTaggingMutationErrorMessage(taggingMutationResult.Errors),
-        ),
-      )
-    }
-  }
-
-  if len(tagsToUpdate) > 0 {
-    taggingMutationResult, err := nrClient.Entities.TaggingReplaceTagsOnEntity(
-      entity.Guid,
-      tagsToUpdate,
-    )
-    if err != nil {
-      errors = append(
-        errors,
-        fmt.Errorf(
-          "updating tags on entity %s (%s) failed: %v",
-          entity.Name,
-          entity.Guid,
-          err,
-        ),
-      )
-    } else if len(taggingMutationResult.Errors) > 0 {
-      errors = append(
-        errors,
-        fmt.Errorf(
-          "updating tags on entity %s (%s) failed: %s",
           entity.Name,
           entity.Guid,
           buildTaggingMutationErrorMessage(taggingMutationResult.Errors),

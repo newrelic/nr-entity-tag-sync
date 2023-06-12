@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrlogrus"
@@ -79,8 +78,18 @@ func (i *Interop) Shutdown() {
   i.App.Shutdown(time.Second * 3)
 }
 
-func (i *Interop) IsEventsEnabled() bool {
-  return i.eventsEnabled
+func (i *Interop) EnableEvents(accountID int) error {
+  // Start batch mode
+  if err := i.NrClient.Events.BatchMode(
+    context.Background(),
+    accountID,
+  ); err != nil {
+    return fmt.Errorf("error starting batch events mode: %v", err)
+  }
+
+  i.eventsEnabled = true
+
+  return nil
 }
 
 func setupLogging(i *Interop, logger *log.Logger) {
@@ -148,32 +157,7 @@ func setupClient(i *Interop) error {
     return fmt.Errorf("error creating New Relic client: %v", err)
   }
 
-  eventsEnabled := viper.GetBool("events.enabled")
-  if eventsEnabled {
-    eventsAccountID := viper.GetString("events.accountId")
-    if eventsAccountID == "" {
-      eventsAccountID = os.Getenv("NEW_RELIC_ACCOUNT_ID")
-      if eventsAccountID == "" {
-        return fmt.Errorf("missing New Relic account ID")
-      }
-    }
-
-    accountID, err := strconv.Atoi(eventsAccountID)
-    if err != nil {
-      return fmt.Errorf("invalid New Relic account ID %s", eventsAccountID)
-    }
-
-    // Start batch mode
-    if err := client.Events.BatchMode(
-      context.Background(),
-      accountID,
-    ); err != nil {
-      return fmt.Errorf("error starting batch events mode: %v", err)
-    }
-  }
-
   i.NrClient = client
-  i.eventsEnabled = eventsEnabled
 
   return nil
 }

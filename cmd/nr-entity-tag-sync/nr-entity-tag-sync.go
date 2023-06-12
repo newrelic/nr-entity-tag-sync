@@ -13,7 +13,7 @@ import (
 func main() {
   i, err := interop.NewInteroperability()
   if err != nil {
-    fmt.Printf("failed to create interop: %s]\n", err)
+    fmt.Printf("failed to create interop: %s\n", err)
     os.Exit(1)
   }
 
@@ -21,7 +21,7 @@ func main() {
 
   syncer, err := sync.New(i)
   if err != nil {
-    fmt.Printf("sync failed: %s\n", err)
+    fmt.Printf("failed to create syncer: %s\n", err)
     os.Exit(2)
   }
 

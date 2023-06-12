@@ -145,7 +145,7 @@ func processEntities(
 
       if result == ENTITY_UPDATE_ERR {
         processingResult.totalEntitiesWithErrors += 1
-        // TODO log errors, add audit event if enabled
+
         i.Logger.Warnf(
           "errors while updating entity %s: see below for errors",
           entityOutline.Name,

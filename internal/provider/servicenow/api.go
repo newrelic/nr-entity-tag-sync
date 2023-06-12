@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -81,6 +82,7 @@ func (snp *ServiceNowProvider) getPaginatedResults(
 
 func (snp *ServiceNowProvider) getRecords(
   tableName         string,
+  query             string,
   fields            []string,
 ) (
   []map[string]interface{},
@@ -91,12 +93,18 @@ func (snp *ServiceNowProvider) getRecords(
 	client := &http.Client{}
   done := false
 
+  sysparmQuery := ""
+  if query != "" {
+    sysparmQuery = "&sysparm_query=" + url.QueryEscape(query)
+  }
+
   url := fmt.Sprintf(
-    "%s/api/now/table/%s?sysparm_fields=sys_id,%s&sysparm_limit=%d&sysparm_offset=0",
+    "%s/api/now/table/%s?sysparm_fields=sys_id,%s&sysparm_limit=%d&sysparm_offset=0%s",
     snp.ApiURL,
     tableName,
     strings.Join(fields, ","),
     snp.PageSize,
+    sysparmQuery,
   )
 
   for ; !done; {

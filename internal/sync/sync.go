@@ -1,11 +1,12 @@
 package sync
 
 import (
-	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
-	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/newrelic/nr-entity-tag-sync/internal/provider"
 	"github.com/newrelic/nr-entity-tag-sync/pkg/interop"
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,8 @@ type Syncer struct {
   log               *logrus.Logger
   mappings          Mappings
   provider          provider.Provider
+  useLastUpdate     bool
+  eventsConfig      *eventsConfig
 }
 
 func New(i *interop.Interop) (*Syncer, error) {
@@ -32,12 +35,57 @@ func New(i *interop.Interop) (*Syncer, error) {
     return nil, err
   }
 
-  return &Syncer{i, i.Logger, mappings, p}, nil
+  events := &eventsConfig{}
+
+  err = viper.UnmarshalKey("events", events)
+  if err != nil {
+    return nil, fmt.Errorf("error parsing events config: %v", err)
+  }
+
+  if events.Enabled {
+    if err := requireAccountID(events); err != nil {
+      return nil, err
+    }
+
+    if err = i.EnableEvents(events.AccountId); err != nil {
+      return nil, err
+    }
+
+    if events.EventType == "" {
+      events.EventType = "EntityTagSync"
+    }
+  }
+
+  return &Syncer{
+    i,
+    i.Logger,
+    mappings,
+    p,
+    viper.GetBool("provider.useLastUpdate"),
+    events,
+  }, nil
 }
 
 func (s *Syncer) Sync() error {
-  for _, mappingConfig := range s.mappings {
-    s.log.Debugf("reading all external entities from provider")
+	cycleId, err := uuid.NewV4()
+	if err != nil {
+		s.syncFailed(uuid.Nil, err)
+	}
+
+  s.syncStarted(cycleId)
+
+  lastUpdateTs, err := s.getLastUpdateTimestamp()
+  if err != nil {
+    return s.syncFailed(cycleId, err)
+  }
+
+  errorCount := 0
+
+  for i, mappingConfig := range s.mappings {
+    s.log.Debugf(
+      "starting mapping %d; reading all external entities from provider",
+      i,
+    )
 
     extEntityTags := []string { mappingConfig.Match.ExtEntityKey }
     extEntityTags = append(extEntityTags, getKeys(mappingConfig.Mapping)...)
@@ -45,15 +93,23 @@ func (s *Syncer) Sync() error {
     extEntities, err := s.provider.GetEntities(
       mappingConfig.ExtEntityQuery,
       extEntityTags,
-      time.Now(),
+      lastUpdateTs,
     )
     if err != nil {
-      return err
+      s.mappingFailed(cycleId, fmt.Errorf("reading entities from provider failed: %v", err))
+      errorCount += 1
+      continue
     }
 
-    s.log.Debugf("read %d entities from provider", len(extEntities))
+    extEntityCount := len(extEntities)
 
-    errMessage := ""
+    if extEntityCount == 0 {
+      s.mappingSkipped(cycleId)
+      continue
+    }
+
+    s.log.Debugf("read %d entities from provider", extEntityCount)
+
     processingResults, err := processEntities(
       s.i,
       &mappingConfig,
@@ -89,58 +145,110 @@ func (s *Syncer) Sync() error {
         )
       },
     )
-    if err != nil {
-      errMessage := fmt.Sprintf("error while processing entities, sync results may be incomplete: %s", err)
-      s.log.Error(errMessage)
-    }
 
-    if s.i.IsEventsEnabled() {
-      event := struct {
-        EventType                 string  `json:"eventType"`
-        Action                    string  `json:"action"`
-        Error                     bool    `json:"error"`
-        ErrorMessage              string  `json:"errorMessage"`
-        TotalExtEntities          int     `json:"totalExternalEntities"`
-        TotalEntities             int     `json:"totalEntities"`
-        TotalEntitiesScanned      int     `json:"totalEntitiesScanned"`
-        TotalEntitiesMatched      int     `json:"totalEntitiesMatched"`
-        TotalEntitiesNoMatch      int     `json:"totalEntitiesNoMatch"`
-        TotalEntitiesSkipped      int     `json:"totalEntitiesSkipped"`
-        TotalEntityUpdates        int     `json:"totalEntityUpdates"`
-        TotalEntityUpdateErrors   int     `json:"totalEntityUpdateErrors"`
-      } {
-        EventType:                  "MyEventType",
-        Action:                     "mapping_complete",
-        Error:                      err != nil,
-        ErrorMessage:               errMessage,
-        TotalExtEntities:           len(extEntities),
-        TotalEntities:              processingResults.totalEntities,
-        TotalEntitiesScanned:       processingResults.totalEntitiesScanned,
-        TotalEntitiesMatched:       processingResults.totalEntitiesMatched,
-        TotalEntitiesNoMatch:       processingResults.totalEntitiesNoMatch,
-        TotalEntitiesSkipped:       processingResults.totalEntitiesSkipped,
-        TotalEntityUpdates:         processingResults.totalEntitiesUpdated,
-        TotalEntityUpdateErrors:    processingResults.totalEntitiesWithErrors,
-      }
+    s.mappingComplete(cycleId, extEntityCount, processingResults, err)
 
-      if err := s.i.NrClient.Events.EnqueueEvent(context.Background(), event);
-        err != nil {
-        s.log.Warnf("failed to push event: %s", err)
-      }
-
-      s.i.Logger.Debugf(
-        "read %d total New Relic entities, %d scanned, %d matched, %d skipped, %d updated, %d updates with errors",
-        processingResults.totalEntities,
-        processingResults.totalEntitiesScanned,
-        processingResults.totalEntitiesMatched,
-        processingResults.totalEntitiesSkipped,
-        processingResults.totalEntitiesUpdated,
-        processingResults.totalEntitiesWithErrors,
-      )
+    if err != nil || processingResults.totalEntitiesWithErrors > 0 {
+      errorCount += 1
     }
   }
 
+  if errorCount > 0 {
+    return s.syncFailed(cycleId, fmt.Errorf("sync completed with errors"))
+  }
+
+  s.syncComplete(cycleId)
+
   return nil
+}
+
+func (s *Syncer) syncStarted(uuid uuid.UUID) {
+  if s.eventsConfig.Enabled {
+    startEvent := s.newAuditEvent(uuid, "sync_start", nil)
+    s.pushEvent(startEvent)
+  }
+
+  s.log.Debugf("sync started")
+}
+
+func (s *Syncer) syncFailed(uuid uuid.UUID, err error) error {
+  if s.eventsConfig.Enabled {
+    endEvent := s.newAuditEvent(uuid, "sync_end", err)
+    s.pushEvent(endEvent)
+  }
+
+  s.log.Debugf("sync failed")
+
+  return err
+}
+
+func (s *Syncer) syncComplete(uuid uuid.UUID) {
+  if s.eventsConfig.Enabled {
+    endEvent := s.newAuditEvent(uuid, "sync_end", nil)
+    s.pushEvent(endEvent)
+  }
+
+  s.log.Debugf("sync complete")
+}
+
+func (s *Syncer) mappingFailed(uuid uuid.UUID, err error) {
+  if s.eventsConfig.Enabled {
+    mappingEvent := s.newAuditEvent(uuid, "mapping_complete", err)
+    s.pushEvent(mappingEvent)
+  }
+  s.log.Error(fmt.Sprintf("mapping failed: %v", err))
+}
+
+func (s *Syncer) mappingSkipped(uuid uuid.UUID) {
+  if s.eventsConfig.Enabled {
+    mappingEvent := s.newAuditEvent(uuid, "mapping_complete", nil)
+
+    mappingEvent["extEntityCount"] = 0
+
+    s.pushEvent(mappingEvent)
+  }
+
+  s.log.Debug("no entities returned from provider; continuing to next mapping")
+}
+
+func (s *Syncer) mappingComplete(
+  uuid                uuid.UUID,
+  extEntityCount      int,
+  processingResults   *entityProcessingResult,
+  err                 error,
+) {
+  if s.eventsConfig.Enabled {
+    mappingEvent := s.newAuditEvent(uuid, "mapping_complete", err)
+
+    mappingEvent["extEntityCount"] = extEntityCount
+    mappingEvent["totalEntityCount"] = processingResults.totalEntities
+    mappingEvent["totalEntitiesScanned"] = processingResults.totalEntitiesScanned
+    mappingEvent["totalEntitiesMatched"] = processingResults.totalEntitiesMatched
+    mappingEvent["totalEntitiesNoMatch"] = processingResults.totalEntitiesNoMatch
+    mappingEvent["totalEntitiesSkipped"] = processingResults.totalEntitiesSkipped
+    mappingEvent["totalEntitiesUpdated"] = processingResults.totalEntitiesUpdated
+    mappingEvent["totalEntitiesWithErrors"] = processingResults.totalEntitiesWithErrors
+
+    s.pushEvent(mappingEvent)
+  }
+
+  if err != nil {
+    s.log.Warnf(
+      "mapping completed with an error; results may be incomplete; see output for details: %v",
+      err,
+    )
+  }
+
+  s.log.Debugf(
+    "read %d external entities, %d total New Relic entities, %d scanned, %d matched, %d skipped, %d updated, %d updates with errors",
+    extEntityCount,
+    processingResults.totalEntities,
+    processingResults.totalEntitiesScanned,
+    processingResults.totalEntitiesMatched,
+    processingResults.totalEntitiesSkipped,
+    processingResults.totalEntitiesUpdated,
+    processingResults.totalEntitiesWithErrors,
+  )
 }
 
 func getMatchingEntity(
@@ -221,6 +329,24 @@ func getMatchingEntity(
         return &extEntity
       }
     }
+  }
+
+  return nil
+}
+
+func requireAccountID(events *eventsConfig) error {
+  if events.AccountId == 0 {
+    eventsAccountID := os.Getenv("NEW_RELIC_ACCOUNT_ID")
+    if eventsAccountID == "" {
+      return fmt.Errorf("missing New Relic account ID")
+    }
+
+    accountID, err := strconv.Atoi(eventsAccountID)
+    if err != nil {
+      return fmt.Errorf("invalid New Relic account ID %s", eventsAccountID)
+    }
+
+    events.AccountId = accountID
   }
 
   return nil
