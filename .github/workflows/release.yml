@@ -43,6 +43,6 @@ jobs:
       uses: goreleaser/goreleaser-action@v4
       if: steps.tag-commit.outputs.next-version != ''
       with:
-        args: release --clean
+        args: release --clean --verbose
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
