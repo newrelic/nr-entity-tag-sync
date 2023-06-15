@@ -21,11 +21,11 @@ builds:
       - goos: windows
         goarch: "386"
         flags:
-        - '-tags timetzdata'
+        - '-tags=timetzdata'
       - goos: windows
         goarch: amd64
         flags:
-        - '-tags timetzdata'
+        - '-tags=timetzdata'
 
 archives:
   - format: tar.gz
