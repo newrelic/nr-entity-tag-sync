@@ -47,7 +47,6 @@ func NewInteroperability() (*Interop, error) {
   viper.SetConfigName("config")
   viper.AddConfigPath("configs")
   viper.AddConfigPath(".")
-  viper.SetDefault("events.enabled", true)
 
   err = viper.ReadInConfig()
   if err != nil {

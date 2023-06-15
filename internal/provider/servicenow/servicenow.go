@@ -83,7 +83,7 @@ func (snp *ServiceNowProvider) GetEntities(
   if ciQuery != "" && lastUpdate != nil {
     ciQuery, err = subsDateTime(ciQuery, config, lastUpdate)
     if err != nil {
-      return nil, fmt.Errorf("error evaluating query template: %v", err)
+      return nil, fmt.Errorf("query datetime substitution failed: %v", err)
     }
   }
 

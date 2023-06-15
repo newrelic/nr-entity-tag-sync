@@ -52,7 +52,7 @@ func (s *Syncer) getLastUpdateTimestamp() (*time.Time, error) {
   }
 
   s.log.Tracef(
-    "querying for latest timestamp for event %s",
+    "querying for latest timestamp for event type %s",
     s.eventsConfig.EventType,
   )
 
@@ -81,7 +81,7 @@ func (s *Syncer) getLastUpdateTimestamp() (*time.Time, error) {
 
   latestTimestamp, ok := val.(float64)
   if !ok {
-    s.log.Warn("timestamp attribute found in result is not an integer")
+    s.log.Warn("timestamp attribute found in result is not a float")
     return nil, nil
   }
 

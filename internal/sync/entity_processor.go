@@ -147,8 +147,9 @@ func processEntities(
         processingResult.totalEntitiesWithErrors += 1
 
         i.Logger.Warnf(
-          "errors while updating entity %s: see below for errors",
+          "errors while updating entity %s (%s): see below for errors",
           entityOutline.Name,
+          entityOutline.Guid,
         )
 
         for _, err := range errors {
@@ -237,9 +238,9 @@ func getEntities(
 ) (*entitySearchResponse, error) {
   var resp entitySearchResponse
 
-	vars := map[string]interface{}{
-		"query":   query,
-	}
+  vars := map[string]interface{}{
+    "query":   query,
+  }
 
   if cursor != "" {
     vars["cursor"] = cursor
@@ -265,5 +266,5 @@ func getEntities(
     return nil, err
   }
 
-	return &resp, nil
+  return &resp, nil
 }

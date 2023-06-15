@@ -63,10 +63,68 @@ entities, enabling fields on CIs to be mapped to tags on New Relic entities.
 
 #### Mappings
 
-A mapping is a set of configuration parameters that defines the set of criteria
-for selecting external entities, the set of criteria for selecting New Relic
-entities, the criteria used to match external entities to New Relic entities,
-and the mapping from external entity key-values to New Relic entity tags.
+Mappings drive the actual synchronization process. Each mapping tells the entity
+tag sync application what external entities to select from the provider, what
+entities to select from New Relic, how to match external entities with New Relic
+entities, and how key-value pairs from the external entity map to tags on the
+New Relic entity.
+
+Mappings are specified in the [mappings](#mapping-parameters) section of
+[the configuration file](#configuration). During the synchronization process,
+the entity tag sync application processes each mapping in order. A mapping is
+processed as follows.
+
+1. Fetch external entities
+
+   All external entities matching the [external entity query criteria](#external-entity-query-criteria)
+   are retrieved via the provider. The keys of the [`mapping`](#mapping) node as
+   well as the value of the `extEntityKey` in the [`match`](#match-strategy)
+   node are passed to the provider indicating the key-value pairs to retrieve
+   for each external entity. The [last update timestamp](#delta-synchronization)
+   is also passed to the provider if one was retrieved.
+
+2. Fetch New Relic entities
+
+   All New Relic entities matching the [New Relic entity query critera](#new-relic-entity-query-criteria)
+   are retrieved via the New Relic GraphQL API
+
+3. Find matching entities
+
+   For each selected New Relic entity, the [match strategy](#match-strategy) is
+   applied to find a matching external entity. If no match is found, processing
+   proceeds to the next New Relic entity or, if all candidate New Relic entities
+   have been processed, to the next mapping. If a match is found, processing
+   continues to the synchronize step.
+
+4. Synchronize tags
+
+   If a match is discovered, the synchronization process executes the following
+   logic for each pair of external entity key, **E**, to New Relic tag name,
+   **T** in the [`mapping`](#mapping) node.
+
+   - If **E** *does not* exist in the external entity metadata and **T**
+     *does not* exist in the tags of the matching New Relic entity, do nothing
+     and continue to the next pair.
+   - If **E** *does not* exist in the external entity metadata and **T** *does*
+     exist in the tags of the matching New Relic entity, delete the tag **T**
+     from the New Relic entity.
+   - If **E** *does* exist in the external entity metadata and **T** *does not*
+     exist in the tags of the matching New Relic entity, add a tag to thew New
+     Relic entity with **E** for the tag name and the value of key **E** in the
+     external entity metadata as the singular tag value.
+   - If **E** *does* exist in the external entity metadata and **T** *does*
+     exist in the tags of the matching New Relic entity, scan the values for the
+     tag **T** in the matching New Relic entity.
+     - If the value of key **E** in the external entity metadata *is* in the
+       values of tag **T**, do nothing and continue to the next pair.
+     - If the value of key **E** in the external entity metadata *is not* in the
+       values of tag **T**, the values of tag **T** are **replaced** with the
+       value of key **E** in the external entity metadata.
+
+   **NOTE:** Case 2 and case 4, subcase 2 above are destructive. In both cases,
+   existing tag values removed. In general it should probably be assumed that
+   the tags being synchronized are managed by the entity tag sync application.
+   and should be modified via other means.
 
 ### Audit Events
 
@@ -178,33 +236,6 @@ The timestamp of the last synchronization is determined by querying NRDB for the
 latest timestamp of the most recent audit event. This is why
 [audit events](#audit-events)must be enabled in order to leverage this feature.
 
-### How It Works
-
-At a high level, the synchronization process works as follows.
-
-- On startup, the entity tag sync application reads in a configuration. The
-  configuration is composed of 3 main parts.
-  1. General configuration parameters
-  2. Provider configuration parameters
-  3. A set of entity mappings
-- If the `provider.useLastUpdate` configuration parameter is set to `true` and
-  the `events.enabled` configuration parameter is set to `true`, the timestamp
-  of the last [audit event](#audit-events) with the [action](#event-actions)
-  `sync_end` is retreived from NRDB
-- For each entity mapping, the following steps are performed.
-  1. All external entities matching the external entity criteria are retrieved
-     via the provider. The keys of the `mapping` node as well as the value of
-     the `extEntityKey` in the `match` node are passed to the provider
-     indicating the key-value pairs to retrieve for each external entity. The
-     last update timestamp is also passed to the provider if one was retrieved.
-  2. All New Relic entities matching the New Relic entity critera are retrieved
-     via the New Relic GraphQL API
-  3. For each New Relic entity, the match criteria is used to resolve the New
-     Relic entity with a matching external entity
-  4. If a match is discovered, the key-value pairs retrieved for the matching
-     external entity are used to populate/update the tags of the matching New
-     Relic entity
-
 ## Installation
 
 The New Relic Entity Tag Sync application can be run as a standalone application
@@ -298,13 +329,13 @@ entities, the set of criteria for selecting New Relic entities, the criteria
 used to match external entities to New Relic entities, and the mapping from
 external entity key-values to New Relic entity tags.
 
-##### Provider entity query criteria
+##### External entity query criteria
 
 The `extEntityQuery` section of a mapping configuration specifies the query
 criteria for selecting a set of external entities. The configuration parameters
 in this section are specific to the provider.
 
-###### ServiceNow CMDB provider entity query criteria
+###### ServiceNow CMDB entity query criteria
 
 The ServiceNow CMDB provider supports the following configuration parameters for
 selecting the set of CIs that are candidates for matching against New Relic
@@ -465,8 +496,15 @@ name of an external entity key, the name of a New Relic entity attribute/tag,
 and an operator used to compare the values of the external entity key to
 the New Relic entity attribute/tag.
 
-The specified external entity key will be added to the list of keys requested
-from the provider for each external entity.
+| Name | Description | Required | Example | Default |
+| --- | --- | --- | --- | --- |
+| `extEntityKey` | The external entity key to use for comparison | Y | `environment` | |
+| `operator` | The type of comparison to use | Y | `equal` | |
+| `entityKey` | The New Relic entity attribute/tag to use for comparison  | Y | `equal` | |
+
+The `extEntityKey` external entity key will be implicitly added to the list of
+keys requested from the provider for each external entity , regardless of whether
+the key is referenced in the [mapping](#mapping) section.
 
 The New Relic entity attribute/tag may be any one of the following.
 
@@ -498,7 +536,7 @@ Given this YAML, New Relic entities will be matched against external entities by
 comparing the values of the tag `bar` on the New Relic entities to the values of
 the key `foo` on the external entities, case insensitively.
 
-##### Tag mapping
+##### Mapping
 
 The `mapping` node of a mapping configuration specifies the mapping from
 external entity keys to New Relic entity tags. The keys of the `mapping` node

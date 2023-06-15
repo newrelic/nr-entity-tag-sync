@@ -67,10 +67,10 @@ func New(i *interop.Interop) (*Syncer, error) {
 }
 
 func (s *Syncer) Sync() error {
-	cycleId, err := uuid.NewV4()
-	if err != nil {
-		s.syncFailed(uuid.Nil, err)
-	}
+  cycleId, err := uuid.NewV4()
+  if err != nil {
+    s.syncFailed(uuid.Nil, err)
+  }
 
   s.syncStarted(cycleId)
 

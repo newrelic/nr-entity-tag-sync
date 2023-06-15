@@ -36,6 +36,12 @@ func updateTags(
       // ext entity key - no
       if entityTagExists {
         // entity key - yes, delete tag
+
+        // NOTE: This is obviously destructive. If the New Relic tag has
+        // values that have been added via the UI or API, these values will
+        // be lost since the entire tag is removed. In general it should
+        // probably be assumed that the tags being synchronized are managed by
+        // the entity tag sync application.
         tagsToDelete = append(tagsToDelete, entityTagName)
         tagChanges += 1
       }
@@ -57,12 +63,14 @@ func updateTags(
           if tag.Key == entityTagName {
             tagsToDelete = append(tagsToDelete, entityTagName)
 
-            // TODO: This is destructive. If the New Relic tag has multiple
+            // NOTE: This is destructive. If the New Relic tag has multiple
             // values and the external entity key is not in those values, we
             // end up removing _all_ the other values for the New Relic tag
             // and add it back just with the one value from the external entity.
             // In other words, it's a replace. Is there a non-destructive
-            // solution?
+            // solution? In general it should probably be assumed that the tags
+            // being synchronized are managed by the entity tag sync
+            // application.
             //vals := make([]string, len(tag.Values))
             //copy(vals, tag.Values)
 
