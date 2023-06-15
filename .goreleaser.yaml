@@ -17,6 +17,14 @@ builds:
     goarch:
       - "386"
       - amd64
+    overrides:
+      - goos: windows
+        goarch: ''
+        goamd64: ''
+        goarm: ''
+        gomips: ''
+        flags:
+        - '-tags timetzdata'
 
 archives:
   - format: tar.gz
