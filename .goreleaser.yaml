@@ -11,7 +11,7 @@ builds:
     env:
       - CGO_ENABLED=0
     flags:
-      - '{{ if eq .CurrentOS "windows" }}-tags=timetzdata{{ end }}'
+      - '{{ if eq .Os "windows" }}-tags=timetzdata{{ end }}'
     goos:
       - linux
       - windows
