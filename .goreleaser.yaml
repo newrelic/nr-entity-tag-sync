@@ -10,8 +10,6 @@ builds:
     main: ./cmd/nr-entity-tag-sync/nr-entity-tag-sync.go
     env:
       - CGO_ENABLED=0
-    flags:
-      - '{{ if eq .Os "windows" }}-tags=timetzdata{{ end }}'
     goos:
       - linux
       - windows
