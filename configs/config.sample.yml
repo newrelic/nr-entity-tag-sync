@@ -1,14 +1,24 @@
-apiUrl: https://api.newrelic.com
+apiKey: XXXXXX
+licenseKey: XXXXXX
+region: US
 log:
   level: warn
-# fileName: trace.log
+  fileName: trace.log
+events:
+  enabled: true
+  accountId: 12345
+  eventType: MyEntityTagSync
 provider:
   type: servicenow
+  useLastUpdate: true
   apiUrl: https://my-service-now.service-now.com
   apiUser: admin
+  pageSize: 100
 mappings:
 - extEntityQuery:
     type: cmdb_ci_email_server
+    query: "sys_updated_on>javascript:gs.dateGenerate('${lastUpdateDate}','${lastUpdateTime}')^operational_status!=2"
+    serverTimezone: America/Los_Angeles
   entityQuery:
     type:
     - APPLICATION

@@ -1,28 +1,38 @@
 package interop
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrlogrus"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/newrelic/nr-entity-tag-sync/pkg/nerdgraph"
+	nrClient "github.com/newrelic/newrelic-client-go/newrelic"
+	"github.com/newrelic/newrelic-client-go/pkg/config"
+	"github.com/newrelic/newrelic-client-go/pkg/logging"
+	"github.com/newrelic/newrelic-client-go/pkg/region"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 type Interop struct {
   App               *newrelic.Application
-  ApiKey            string
-  ApiURL            string
   Logger            *log.Logger
-  Nerdgraph         *nerdgraph.NerdgraphClient
+  NrClient          *nrClient.NewRelic
+  eventsEnabled     bool
+}
+
+func ConfigLicenseKey(licenseKey string) nrClient.ConfigOption {
+	return func(cfg *config.Config) error {
+		cfg.LicenseKey = licenseKey
+		return nil
+	}
 }
 
 func NewInteroperability() (*Interop, error) {
   app, err := newrelic.NewApplication(
-    newrelic.ConfigAppName("New Relic Entity CMDB Sync"),
+    newrelic.ConfigAppName("New Relic Entity Tag Sync"),
     newrelic.ConfigLicense(os.Getenv("NEW_RELIC_LICENSE_KEY")),
   )
   if err != nil {
@@ -43,43 +53,50 @@ func NewInteroperability() (*Interop, error) {
     return nil, err
   }
 
-  setupLogging(logger)
+  i := &Interop{}
+  i.App = app
 
-  apiKey := viper.GetString("apiKey")
-  if apiKey == "" {
-    apiKey = os.Getenv("NEW_RELIC_API_KEY")
-    if apiKey == "" {
-      return nil, fmt.Errorf("missing New Relic API key")
-    }
+  setupLogging(i, logger)
+
+  err = setupClient(i)
+  if err != nil {
+    return nil, err
   }
 
-  apiUrl := viper.GetString("apiUrl")
-  if apiUrl == "" {
-    apiUrl = os.Getenv("NEW_RELIC_API_URL")
-    if apiUrl == "" {
-      apiUrl = "https://api.newrelic.com"
-    }
-  }
-
-  nerdgraph := &nerdgraph.NerdgraphClient{
-    ApiURL: apiUrl,
-    ApiKey: apiKey,
-    Logger: logger,
-  }
-
-  return &Interop{app, apiKey, apiUrl, logger, nerdgraph}, nil
+  return i, nil
 }
 
 func (i *Interop) Shutdown() {
+  if i.eventsEnabled {
+    err := i.sendEventsAndWait()
+    if err != nil {
+      i.Logger.Warnf("flush event queue to New Relic failed: %v", err)
+    }
+  }
+
   i.App.Shutdown(time.Second * 3)
 }
 
-func setupLogging(logger *log.Logger) {
+func (i *Interop) EnableEvents(accountID int) error {
+  // Start batch mode
+  if err := i.NrClient.Events.BatchMode(
+    context.Background(),
+    accountID,
+  ); err != nil {
+    return fmt.Errorf("error starting batch events mode: %v", err)
+  }
+
+  i.eventsEnabled = true
+
+  return nil
+}
+
+func setupLogging(i *Interop, logger *log.Logger) {
   logLevel := viper.GetString("log.level")
   if logLevel != "" {
     level, err := log.ParseLevel(logLevel)
     if err != nil {
-      log.Infof("failed to parse log level, default will be used: %s", err)
+      log.Warnf("failed to parse log level, default will be used: %s", err)
     } else {
       logger.SetLevel(level)
     }
@@ -92,9 +109,65 @@ func setupLogging(logger *log.Logger) {
       0666,
     )
     if err != nil {
-      log.Infof("failed to log to file, using default stderr: %s", err)
+      log.Warnf("failed to log to file, using default stderr: %s", err)
     } else {
       logger.Out = file
     }
   }
+
+  i.Logger = logger
+}
+
+func setupClient(i *Interop) error {
+  licenseKey := viper.GetString("licenseKey")
+  if licenseKey == "" {
+    licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
+    if licenseKey == "" {
+      return fmt.Errorf("missing New Relic license key")
+    }
+  }
+
+  apiKey := viper.GetString("apiKey")
+  if apiKey == "" {
+    apiKey = os.Getenv("NEW_RELIC_API_KEY")
+    if apiKey == "" {
+      return fmt.Errorf("missing New Relic API key")
+    }
+  }
+
+  nrRegion := viper.GetString("region")
+  if nrRegion == "" {
+    nrRegion = os.Getenv("NEW_RELIC_REGION")
+    if nrRegion == "" {
+      nrRegion = string(region.Default)
+    }
+  }
+
+  // Initialize the New Relic Go Client
+  client, err := nrClient.New(
+    ConfigLicenseKey(licenseKey),
+    nrClient.ConfigPersonalAPIKey(apiKey),
+    nrClient.ConfigRegion(nrRegion),
+    nrClient.ConfigLogger(
+      logging.NewLogrusLogger(logging.ConfigLoggerInstance(i.Logger)),
+    ),
+  )
+  if err != nil {
+    return fmt.Errorf("error creating New Relic client: %v", err)
+  }
+
+  i.NrClient = client
+
+  return nil
+}
+
+func (i *Interop) sendEventsAndWait() error {
+  err := i.NrClient.Events.Flush()
+  if err != nil {
+    return err
+  }
+
+  <-time.After(3 * time.Second)
+
+  return nil
 }

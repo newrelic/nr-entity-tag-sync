@@ -1,139 +1,272 @@
 package sync
 
 import (
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/gofrs/uuid"
 	"github.com/newrelic/nr-entity-tag-sync/internal/provider"
 	"github.com/newrelic/nr-entity-tag-sync/pkg/interop"
-	"github.com/newrelic/nr-entity-tag-sync/pkg/nerdgraph"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
-func getNestedHelper(
-  path []string,
-  m map[string]interface{},
-  index int,
-) string {
-  if index >= len(path) {
-    return ""
+type Syncer struct {
+  i                 *interop.Interop
+  log               *logrus.Logger
+  mappings          Mappings
+  provider          provider.Provider
+  useLastUpdate     bool
+  eventsConfig      *eventsConfig
+}
+
+func New(i *interop.Interop) (*Syncer, error) {
+  mappings := Mappings{}
+
+  err := viper.UnmarshalKey("mappings", &mappings)
+  if err != nil {
+    return nil, err
   }
 
-  v, ok := m[path[index]]
-  if !ok {
-    return ""
+  p, err := provider.GetProvider(i)
+  if err != nil {
+    return nil, err
   }
 
-  switch u := v.(type) {
-  case string:
-    if index + 1 == len(path) {
-      return u
+  events := &eventsConfig{}
+
+  err = viper.UnmarshalKey("events", events)
+  if err != nil {
+    return nil, fmt.Errorf("error parsing events config: %v", err)
+  }
+
+  if events.Enabled {
+    if err := requireAccountID(events); err != nil {
+      return nil, err
     }
-    return ""
 
-  case map[string]interface{}:
-    return getNestedHelper(path, u, index + 1)
-  }
+    if err = i.EnableEvents(events.AccountId); err != nil {
+      return nil, err
+    }
 
-  return ""
-}
-
-func getNestedKeyValue(path string, m map[string]interface{}) string {
-  return getNestedHelper(strings.Split(path, "."), m, 0)
-}
-
-func getKeys(m map[string]string) []string {
-  keys := make([]string, len(m))
-
-  i := 0
-  for k := range m {
-    keys[i] = k
-    i += 1
-  }
-
-  return keys
-}
-
-func getEntityTagValue(
-  i *interop.Interop,
-  entity *nerdgraph.EntityOutline,
-  tagName string,
-) string {
-  for _, tag := range entity.Tags {
-    if tag.Key == tagName {
-      // TODO: for now use first value
-      return tag.Values[0]
+    if events.EventType == "" {
+      events.EventType = "EntityTagSync"
     }
   }
 
-  return ""
+  return &Syncer{
+    i,
+    i.Logger,
+    mappings,
+    p,
+    viper.GetBool("provider.useLastUpdate"),
+    events,
+  }, nil
 }
 
-func getEntityKeyValue(
-  entityKey string,
-  entity *nerdgraph.EntityOutline,
-) string {
-  if strings.EqualFold(entityKey, "name") {
-    return entity.Name
-  } else if strings.EqualFold(entityKey, "guid") {
-    return entity.Guid
-  } else if strings.EqualFold(entityKey, "accountId") {
-    return strconv.Itoa(entity.AccountId)
+func (s *Syncer) Sync() error {
+  cycleId, err := uuid.NewV4()
+  if err != nil {
+    s.syncFailed(uuid.Nil, err)
   }
 
-  for _, tag := range entity.Tags {
-    if strings.EqualFold(entityKey, tag.Key) && len(tag.Values) > 0 {
-      return tag.Values[0]
+  s.syncStarted(cycleId)
+
+  lastUpdateTs, err := s.getLastUpdateTimestamp()
+  if err != nil {
+    return s.syncFailed(cycleId, err)
+  }
+
+  errorCount := 0
+
+  for i, mappingConfig := range s.mappings {
+    s.log.Debugf(
+      "starting mapping %d; reading all external entities from provider",
+      i,
+    )
+
+    extEntityTags := []string { mappingConfig.Match.ExtEntityKey }
+    extEntityTags = append(extEntityTags, getKeys(mappingConfig.Mapping)...)
+
+    extEntities, err := s.provider.GetEntities(
+      mappingConfig.ExtEntityQuery,
+      extEntityTags,
+      lastUpdateTs,
+    )
+    if err != nil {
+      s.mappingFailed(cycleId, fmt.Errorf("reading entities from provider failed: %v", err))
+      errorCount += 1
+      continue
+    }
+
+    extEntityCount := len(extEntities)
+
+    if extEntityCount == 0 {
+      s.mappingSkipped(cycleId)
+      continue
+    }
+
+    s.log.Debugf("read %d entities from provider", extEntityCount)
+
+    processingResults, err := processEntities(
+      s.i,
+      &mappingConfig,
+      func (
+        i                 *interop.Interop,
+        mapping           *MappingConfig,
+        entity            *EntityOutline,
+      ) (entityProcessorResult, []error) {
+        extEntity := getMatchingEntity(
+          s.i,
+          entity,
+          &mapping.Match,
+          extEntities,
+        )
+        if extEntity == nil {
+          // No entity with a value for extEntityKey that maches an entity with a
+          // value for entityKey
+          return ENTITY_NO_MATCH, nil
+        }
+
+        s.log.Debugf(
+          "external entity %s matches New Relic entity %s (%s)",
+          extEntity.ID,
+          entity.Name,
+          entity.Guid,
+        )
+
+        return updateTags(
+          s.i,
+          mappingConfig.Mapping,
+          extEntity,
+          entity,
+        )
+      },
+    )
+
+    s.mappingComplete(cycleId, extEntityCount, processingResults, err)
+
+    if err != nil || processingResults.totalEntitiesWithErrors > 0 {
+      errorCount += 1
     }
   }
 
-  return ""
+  if errorCount > 0 {
+    return s.syncFailed(cycleId, fmt.Errorf("sync completed with errors"))
+  }
+
+  s.syncComplete(cycleId)
+
+  return nil
 }
 
-func getExtEntityTagValue(
-  i *interop.Interop,
-  extEntity *provider.Entity,
-  tagName string,
-) string {
-  return getNestedKeyValue(tagName, extEntity.Tags)
+func (s *Syncer) syncStarted(uuid uuid.UUID) {
+  if s.eventsConfig.Enabled {
+    startEvent := s.newAuditEvent(uuid, "sync_start", nil)
+    s.pushEvent(startEvent)
+  }
+
+  s.log.Debugf("sync started")
 }
 
-func getEntities(i *interop.Interop, mapping *MappingConfig) (
-  []nerdgraph.EntityOutline,
-  error,
+func (s *Syncer) syncFailed(uuid uuid.UUID, err error) error {
+  if s.eventsConfig.Enabled {
+    endEvent := s.newAuditEvent(uuid, "sync_end", err)
+    s.pushEvent(endEvent)
+  }
+
+  s.log.Debugf("sync failed")
+
+  return err
+}
+
+func (s *Syncer) syncComplete(uuid uuid.UUID) {
+  if s.eventsConfig.Enabled {
+    endEvent := s.newAuditEvent(uuid, "sync_end", nil)
+    s.pushEvent(endEvent)
+  }
+
+  s.log.Debugf("sync complete")
+}
+
+func (s *Syncer) mappingFailed(uuid uuid.UUID, err error) {
+  if s.eventsConfig.Enabled {
+    mappingEvent := s.newAuditEvent(uuid, "mapping_complete", err)
+    s.pushEvent(mappingEvent)
+  }
+  s.log.Error(fmt.Sprintf("mapping failed: %v", err))
+}
+
+func (s *Syncer) mappingSkipped(uuid uuid.UUID) {
+  if s.eventsConfig.Enabled {
+    mappingEvent := s.newAuditEvent(uuid, "mapping_complete", nil)
+
+    mappingEvent["extEntityCount"] = 0
+
+    s.pushEvent(mappingEvent)
+  }
+
+  s.log.Debug("no entities returned from provider; continuing to next mapping")
+}
+
+func (s *Syncer) mappingComplete(
+  uuid                uuid.UUID,
+  extEntityCount      int,
+  processingResults   *entityProcessingResult,
+  err                 error,
 ) {
-  nrEntityQuery := &nerdgraph.EntityQuery{
-    Type: mapping.EntityQuery.Type,
-    Domain: mapping.EntityQuery.Domain,
-    Name: mapping.EntityQuery.Name,
-    AccountId: mapping.EntityQuery.AccountId,
-    Tags: nil,
-    Query: mapping.EntityQuery.Query,
+  if s.eventsConfig.Enabled {
+    mappingEvent := s.newAuditEvent(uuid, "mapping_complete", err)
+
+    mappingEvent["extEntityCount"] = extEntityCount
+    mappingEvent["totalEntityCount"] = processingResults.totalEntities
+    mappingEvent["totalEntitiesScanned"] = processingResults.totalEntitiesScanned
+    mappingEvent["totalEntitiesMatched"] = processingResults.totalEntitiesMatched
+    mappingEvent["totalEntitiesNoMatch"] = processingResults.totalEntitiesNoMatch
+    mappingEvent["totalEntitiesSkipped"] = processingResults.totalEntitiesSkipped
+    mappingEvent["totalEntitiesUpdated"] = processingResults.totalEntitiesUpdated
+    mappingEvent["totalEntitiesWithErrors"] = processingResults.totalEntitiesWithErrors
+
+    s.pushEvent(mappingEvent)
   }
 
-  if len(mapping.EntityQuery.Tags) > 0 {
-    for _, tag := range mapping.EntityQuery.Tags {
-      nrEntityQuery.Tags = append(
-        nrEntityQuery.Tags,
-        nerdgraph.Tag{Key: tag.Key, Values: tag.Values},
-      )
-    }
+  if err != nil {
+    s.log.Warnf(
+      "mapping completed with an error; results may be incomplete; see output for details: %v",
+      err,
+    )
   }
 
-  return i.Nerdgraph.GetEntities(nrEntityQuery)
+  s.log.Debugf(
+    "read %d external entities, %d total New Relic entities, %d scanned, %d matched, %d skipped, %d updated, %d updates with errors",
+    extEntityCount,
+    processingResults.totalEntities,
+    processingResults.totalEntitiesScanned,
+    processingResults.totalEntitiesMatched,
+    processingResults.totalEntitiesSkipped,
+    processingResults.totalEntitiesUpdated,
+    processingResults.totalEntitiesWithErrors,
+  )
 }
 
 func getMatchingEntity(
-  i *interop.Interop,
-  entity *nerdgraph.EntityOutline,
-  match *Match,
-  extEntities []provider.Entity,
+  i                 *interop.Interop,
+  entity            *EntityOutline,
+  match             *Match,
+  extEntities       []provider.Entity,
 ) *provider.Entity {
-  entityKeyValue := getEntityKeyValue(match.EntityKey, entity)
-  if entityKeyValue == "" {
+  entityKeyValue, entityKeyExists := getEntityKeyValue(
+    i,
+    entity,
+    match.EntityKey,
+  )
+  if !entityKeyExists || entityKeyValue == "" {
     // This entity does not have a value for the entity match key
-    i.Logger.Debugf(
-      "skipping entity %s because it does not have the match key %s or the match key is not a string value",
+    i.Logger.Tracef(
+      "skipping entity %s (%s) because it does not have the match key %s or the match key is not a string value",
+      entity.Name,
       entity.Guid,
       match.EntityKey,
     )
@@ -141,11 +274,15 @@ func getMatchingEntity(
   }
 
   for _, extEntity := range extEntities {
-    extEntityKeyValue := getExtEntityTagValue(i, &extEntity, match.ExtEntityKey)
-    if extEntityKeyValue == "" {
+    extEntityKeyValue, extEntityKeyExists := getExtEntityKeyValue(
+      i,
+      &extEntity,
+      match.ExtEntityKey,
+    )
+    if !extEntityKeyExists || extEntityKeyValue == "" {
       // This external entity does not have a value for the external entity
       // match key or the value is not a string
-      i.Logger.Debugf(
+      i.Logger.Tracef(
         "skipping external entity %s because it does not have the match key %s or the match key is not a string value",
         extEntity.ID,
         match.ExtEntityKey,
@@ -153,7 +290,7 @@ func getMatchingEntity(
       continue
     }
 
-    i.Logger.Debugf(
+    i.Logger.Tracef(
       "comparing external entity key %s against entity key %s using strategy %s",
       extEntityKeyValue,
       entityKeyValue,
@@ -197,118 +334,19 @@ func getMatchingEntity(
   return nil
 }
 
-func updateTags(
-  i *interop.Interop,
-  mapping Mapping,
-  extEntity *provider.Entity,
-  entity *nerdgraph.EntityOutline,
-) error {
-  tagsToDelete := []string{}
-  tagsToAdd := []nerdgraph.Tag{}
-
-  for extEntityTagName, entityTagName := range mapping {
-    extEntityTagValue := getExtEntityTagValue(i, extEntity, extEntityTagName)
-    entityTagValue := getEntityTagValue(i, entity, entityTagName)
-
-    if extEntityTagValue == "" && entityTagValue != "" {
-      // No tag on external entity but internal entity has one, delete on entity
-      tagsToDelete = append(tagsToDelete, entityTagName)
-    } else if extEntityTagValue != "" && entityTagValue == "" {
-      // Tag on external entity but not on internal entity, add to entity
-      tagsToAdd = append(tagsToAdd, nerdgraph.Tag{
-        Key: entityTagName,
-        Values: []string {extEntityTagValue},
-      })
-    } else if
-      (extEntityTagValue != "" && entityTagValue != "") &&
-      (extEntityTagValue != entityTagValue) {
-      tagsToDelete = append(tagsToDelete, entityTagName)
-      tagsToAdd = append(tagsToAdd, nerdgraph.Tag{
-        Key: entityTagName,
-        Values: []string {extEntityTagValue},
-      })
+func requireAccountID(events *eventsConfig) error {
+  if events.AccountId == 0 {
+    eventsAccountID := os.Getenv("NEW_RELIC_ACCOUNT_ID")
+    if eventsAccountID == "" {
+      return fmt.Errorf("missing New Relic account ID")
     }
-  }
 
-  if len(tagsToDelete) > 0 {
-    err := i.Nerdgraph.DeleteTags(entity, tagsToDelete)
+    accountID, err := strconv.Atoi(eventsAccountID)
     if err != nil {
-      return err
-    }
-  }
-
-  if len(tagsToAdd) > 0 {
-    err := i.Nerdgraph.AddTags(entity, tagsToAdd)
-    if err != nil {
-      return err
-    }
-  }
-
-  return nil
-}
-
-func Sync(i *interop.Interop) error {
-  mappings := Mappings{}
-
-  err := viper.UnmarshalKey("mappings", &mappings)
-  if err != nil {
-    return err
-  }
-
-  p, err := provider.GetProvider(i)
-  if err != nil {
-    return err
-  }
-
-  //updates := []EntityUpdate
-
-  for _, mappingConfig := range mappings {
-    i.Logger.Debugf("reading all external entities from provider")
-
-    extEntityTags := []string { mappingConfig.Match.ExtEntityKey }
-    extEntityTags = append(extEntityTags, getKeys(mappingConfig.Mapping)...)
-
-    extEntities, err := p.GetEntities(
-      mappingConfig.ExtEntityQuery,
-      extEntityTags,
-    )
-    if err != nil {
-      return err
+      return fmt.Errorf("invalid New Relic account ID %s", eventsAccountID)
     }
 
-    i.Logger.Debugf("read %d entities from provider", len(extEntities))
-
-    entities, err := getEntities(i, &mappingConfig)
-    if err != nil {
-      return err
-    }
-
-    i.Logger.Debugf("found %d entities in New Relic", len(entities))
-
-    for _, entity := range entities {
-      extEntity := getMatchingEntity(
-        i,
-        &entity,
-        &mappingConfig.Match,
-        extEntities,
-      )
-      if extEntity == nil {
-        // No entity with a value for extEntityKey that maches an entity with a
-        // value for entityKey
-        continue
-      }
-
-      i.Logger.Debugf(
-        "external entity %s matches entity %s",
-        extEntity.ID,
-        entity.Guid,
-      )
-
-      err = updateTags(i, mappingConfig.Mapping, extEntity, &entity)
-      if err != nil {
-        return err
-      }
-    }
+    events.AccountId = accountID
   }
 
   return nil

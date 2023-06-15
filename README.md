@@ -63,32 +63,178 @@ entities, enabling fields on CIs to be mapped to tags on New Relic entities.
 
 #### Mappings
 
-A mapping is a set of configuration parameters that defines the set of criteria
-for selecting external entities, the set of criteria for selecting New Relic
-entities, the criteria used to match external entities to New Relic entities,
-and the mapping from external entity key-values to New Relic entity tags.
+Mappings drive the actual synchronization process. Each mapping tells the entity
+tag sync application what external entities to select from the provider, what
+entities to select from New Relic, how to match external entities with New Relic
+entities, and how key-value pairs from the external entity map to tags on the
+New Relic entity.
 
-### How It Works
+Mappings are specified in the [mappings](#mapping-parameters) section of
+[the configuration file](#configuration). During the synchronization process,
+the entity tag sync application processes each mapping in order. A mapping is
+processed as follows.
 
-At a high level, the synchronization process works as follows.
+1. Fetch external entities
 
-- On startup, the entity tag sync application reads in a configuration. The
-  configuration is composed of 3 main parts.
-  1. General configuration parameters
-  2. Provider configuration parameters
-  3. A set of entity mappings
-- For each entity mapping, the following steps are performed.
-  1. All external entities matching the external entity criteria are retrieved
-     via the provider. The keys of the `mapping` node as well as the value of
-     the `extEntityKey` in the `match` node are passed to the provider
-     indicating the key-value pairs to retrieve for each external entity.
-  2. All New Relic entities matching the New Relic entity critera are retrieved
-     via the New Relic GraphQL API
-  3. For each New Relic entity, the match criteria is used to resolve the New
-     Relic entity with a matching external entity
-  4. If a match is discovered, the key-value pairs retrieved for the matching
-     external entity are used to populate/update the tags of the matching New
-     Relic entity
+   All external entities matching the [external entity query criteria](#external-entity-query-criteria)
+   are retrieved via the provider. The keys of the [`mapping`](#mapping) node as
+   well as the value of the `extEntityKey` in the [`match`](#match-strategy)
+   node are passed to the provider indicating the key-value pairs to retrieve
+   for each external entity. The [last update timestamp](#delta-synchronization)
+   is also passed to the provider if one was retrieved.
+
+2. Fetch New Relic entities
+
+   All New Relic entities matching the [New Relic entity query critera](#new-relic-entity-query-criteria)
+   are retrieved via the New Relic GraphQL API
+
+3. Find matching entities
+
+   For each selected New Relic entity, the [match strategy](#match-strategy) is
+   applied to find a matching external entity. If no match is found, processing
+   proceeds to the next New Relic entity or, if all candidate New Relic entities
+   have been processed, to the next mapping. If a match is found, processing
+   continues to the synchronize step.
+
+4. Synchronize tags
+
+   If a match is discovered, the synchronization process executes the following
+   logic for each pair of external entity key, **E**, to New Relic tag name,
+   **T** in the [`mapping`](#mapping) node.
+
+   - If **E** *does not* exist in the external entity metadata and **T**
+     *does not* exist in the tags of the matching New Relic entity, do nothing
+     and continue to the next pair.
+   - If **E** *does not* exist in the external entity metadata and **T** *does*
+     exist in the tags of the matching New Relic entity, delete the tag **T**
+     from the New Relic entity.
+   - If **E** *does* exist in the external entity metadata and **T** *does not*
+     exist in the tags of the matching New Relic entity, add a tag to thew New
+     Relic entity with **E** for the tag name and the value of key **E** in the
+     external entity metadata as the singular tag value.
+   - If **E** *does* exist in the external entity metadata and **T** *does*
+     exist in the tags of the matching New Relic entity, scan the values for the
+     tag **T** in the matching New Relic entity.
+     - If the value of key **E** in the external entity metadata *is* in the
+       values of tag **T**, do nothing and continue to the next pair.
+     - If the value of key **E** in the external entity metadata *is not* in the
+       values of tag **T**, the values of tag **T** are **replaced** with the
+       value of key **E** in the external entity metadata.
+
+   **NOTE:** Case 2 and case 4, subcase 2 above are destructive. In both cases,
+   existing tag values removed. In general it should probably be assumed that
+   the tags being synchronized are managed by the entity tag sync application.
+   and should be modified via other means.
+
+### Audit Events
+
+The entity tag sync application is capable of producing audit events at various
+points during the synchronization process. This feature is disabled by default
+but can be enabled by setting the `events.enabled`
+[general configuration parameter](#general-parameters). When enabled, the entity
+tag sync application will produce events with the event type specified in the
+`events.eventType` [general configuration parameter](#general-parameters) or the
+event type `EntityTagSync` by default. The following attributes and values are
+captured for _every_ event. Additional attributes are [action](#event-actions)
+dependent.
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `id` | string | A canonical RFC-4122 UUID string that uniquely identifies each synchronization cycle |
+| `action` | string | A string identifying the [action](#event-actions) that this event describes |
+| `error` | bool | Flag indicating if an error occurred during this transaction or not |
+| `errorMessage` | string | If an error occurred, a message describing what happened |
+
+#### Event Actions
+
+The following `action`s are produced along with any additional attributes
+captured by each action.
+
+**sync_start**
+
+This action is produced at the start of each sync cycle and does not carry any
+additional attributes. Note that the `error` attribute for this action will
+always be `false` and the `errorMessage` attribute  will always be empty.
+
+**sync_end**
+
+This action is produced at the end of each sync cycle and does not carry any
+additional attributes. The `error` attribute for this action will be set to
+`true` if _any_ error occurred, including the case where the sync cycle finishes
+successfully but a specific mapping has update errors. The `errorMessage`
+attribute will be set providing more details.
+
+**mapping_complete**
+
+This action is produced each time during a sync cycle that the entity tag sync
+application finishes processing a [mapping](#mappings). The set of attributes
+captured for this action fall into one of three cases.
+
+1. If an error occurred while processing the mapping, The `error` attribute for
+   this action will be set to `true`, the `errorMessage` attribute will be set
+   providing more details, and no additional attributes will be present.
+1. If no external entities were returned by the [provider](#providers), not due
+   to an error, the `error` attribute for this action will be `false`, the
+   `errorMessage` attribute will be empty, and the `extEntityCount` attribute
+   will be set to `0`, indicating that no external entities were returned and
+   the subsequent mapping process was skipped since there was nothing to do.
+1. If the overall mapping process completed, even if there were errors updating
+   _some_ entities, the `error` attribute for this action will be `false`, the
+   `errorMessage` attribute will be empty and the following attributes will be
+   set.
+
+    * `extEntityCount` - the number of external entities returned by the
+      [provider](#providers)
+    * `totalEntityCount` - the total number of New Relic entities that matched
+      the [New Relic entity criteria](#new-relic-entity-query-criteria)
+    * `totalEntitiesScanned` - the total number of New Relic entities that were
+      tested against the external entities using [the match strategy](#match-strategy).
+      This might be different than the `totalEntityCount` if an error occurred
+      before all entities could be processed.
+    * `totalEntitiesMatched` - the total number of New Relic entities that
+      matched an external entity according to [the match strategy](#match-strategy)
+    * `totalEntitiesNoMatch` - the total number of New Relic entities that did
+      not match an external entity according to [the match strategy](#match-strategy)
+    * `totalEntitiesSkipped` - the total number of New Relic entities that
+      matched an external entity according to [the match strategy](#match-strategy)
+      but were up-to-date with the external entity and did not require updates
+    * `totalEntitiesUpdated` - the total number of New Relic entities that
+      matched an external entity according to [the match strategy](#match-strategy)
+      and were updated successfully
+    * `totalEntitiesWithErrors` - the total number of New Relic entities that
+      matched an external entity according to [the match strategy](#match-strategy)
+      but were not updated successfully due to errors
+
+### Delta Synchronization
+
+By default, the synchronization cycle is stateless. As a result, unless
+implemented directly by the provider, the provider has no way to determine when
+the last synchronization was run which will likely cause the provider to
+retrieve all external entities during each synchronization cycle. This may be
+expensive in terms of consumed resources, especially as the data set of external
+entities and/or the number of key-value pairs being retrieved increase.
+
+To address this issue, the entity tag sync application can be configured to
+"maintain" the timestamp of the last synchronization and pass the timestamp to
+the provider when retrieving external entities. To enable this feature, the
+`provider.useLastUpdate` flag must be set to `true` and [audit events](#audit-events)
+must be enabled.
+
+When enabled, the entity tag sync application will query NRDB for the latest
+occurence of the [audit event](#audit-events) with the event type specified in
+the `events.eventName` configuration parameter for which the value of the
+`action` attribute is set to `sync_end`. The resulting timestamp is passed to
+the provider implementation as the third parameter of the
+[`GetEntities`](https://github.com/newrelic/nr-entity-tag-sync/blob/main/internal/provider/provider.go#L17)
+function.
+
+Provider implementations are not required to support this feature but providers
+that do support it must honor it when it is passed.
+
+**NOTE:** This functionality is currently implemented in a fairly primitive way.
+The timestamp of the last synchronization is determined by querying NRDB for the
+latest timestamp of the most recent audit event. This is why
+[audit events](#audit-events)must be enabled in order to leverage this feature.
 
 ## Installation
 
@@ -133,22 +279,35 @@ log:
 
 | Name | Environment Variable | Description | Required | Example | Default |
 | --- | --- | --- | --- | --- | --- |
-| `apiUrl` | `NEW_RELIC_API_URL` | The New Relic GraphQL API URL | Y | https://api.newrelic.com | https://api.newrelic.com |
 | `apiKey` | `NEW_RELIC_API_KEY` | A New Relic User API key | Y | `NRAK-123456` | |
+| `licenseKey` | `NEW_RELIC_LICENSE_KEY` | A New Relic Ingest License Key used for the Event API | Y if events enabled | `123456NRAL` | |
+| `region` | `NEW_RELIC_REGION` | The New Relic datacenter to access (`US` or `EU`) | N | `US` | `US` |
 | `log.level` | | The application log level | N | `debug` | `warn` |
 | `log.fileName` | | Log file name | N | `app.log` | Standard output |
+| `events.enabled` | | Flag to enable [audit event](#audit-events) | N | `true` | `false` |
+| `events.accountId` | `NEW_RELIC_ACCOUNT_ID` | New Relic account where [audit events](#audit-events) are posted | Y if events enabled | `12345` | |
+| `events.eventName` | | Name of [audit event](#audit-events) type | N | `MyCustomTagSyncEvent` | `EntityTagSync` |
+
+**NOTE:** The `licenseKey` parameter in the configuration file can *not* be used
+for configuring the Go APM agent that is used to instrument the app. The Go APM
+agent bootstraps before the configuration is read and therefore the
+`NEW_RELIC_LICENSE_KEY` environment variable must be used for this purpose.
 
 #### Provider parameters
 
 The `provider` section of the configuration file is used to specify the
-parameters for the external entity provider. The `type` parameter specifies the
-provider implementation to use and is the only common parameter in the
-`provider` section. The following values for the `type` parameter are supported.
+parameters for the external entity provider. This section contains common
+parameters that are provider indepent and parameters that are specific to the
+selected provider. The following common parameters are supported.
 
-* `servicenow` (default)
+| Name | Description | Required | Example | Default |
+| --- | --- | --- | --- | --- |
+| `type` | The provider implementation to use | Y | `servicenow` | |
+| `useLastUpdate` | Flag to enable [delta synchronization](#delta-synchronization) | N | `true` | `false` |
 
-The remaining parameters in this section are particular to the provider
-implementation.
+The following values for the `type` parameter are supported.
+
+* [`servicenow`](#servicenow-cmdb-provider-parameters)
 
 ##### ServiceNow CMDB provider parameters
 
@@ -170,13 +329,13 @@ entities, the set of criteria for selecting New Relic entities, the criteria
 used to match external entities to New Relic entities, and the mapping from
 external entity key-values to New Relic entity tags.
 
-##### Provider entity query criteria
+##### External entity query criteria
 
 The `extEntityQuery` section of a mapping configuration specifies the query
 criteria for selecting a set of external entities. The configuration parameters
 in this section are specific to the provider.
 
-###### ServiceNow CMDB provider entity query criteria
+###### ServiceNow CMDB entity query criteria
 
 The ServiceNow CMDB provider supports the following configuration parameters for
 selecting the set of CIs that are candidates for matching against New Relic
@@ -185,6 +344,8 @@ entities.
 | Name | Description | Required | Example | Default |
 | --- | --- | --- | --- | --- |
 | `type` | The ServiceNow CMDB configuration item type name | Y | `cmdb_ci_email_server` | |
+| `query` | An [encoded query string](https://docs.servicenow.com/csh?topicname=c_EncodedQueryStrings&version=utah&pubname=utah-platform-user-interface) to use to filter the result using  the `sysparm_query` parameter | N | `sys_updated_on>javascript:gs.dateGenerate('{{ .lastUpdateDate }}','{{ .lastUpdateTime }}')^operational_status!=2` | |
+| `serverTimezone` | A [location name](https://pkg.go.dev/time#LoadLocation) corresponding to a file in the IANA Time Zone database for the time zone of the local ServiceNow instance | N | `America/New_York` | |
 
 The ServiceNow CMDB query is executed by querying the `table` API using a URL
 like the following.
@@ -196,7 +357,26 @@ values of `FIELD1,...,FIELDN` are the keys of the `mapping` node as well as the
 value of the `extEntityKey` in the `match` node. The value of `PAGESIZE` is the
 value of the `pageSize` parameter of the `provider` node.
 
-For example, consider the following YAML.
+**Query parameter**
+
+If a `query` is specified in the entity query criteria, the `sysparm_query`
+query parameter will be added to the query portion of the URL. The `query`
+parameter value will be _automatically_ URL encoded so it should not be
+specified in URL encoded format. For example to filter records where the
+`active` field is `true` and the `roles` field is `itil`, specify the string
+`active=true^roles=itil` and not `active%3Dtrue%5Eroles%3Ditil`.
+
+When using [delta synchronization](#delta-synchronization), the special
+character sequences `${lastUpdateDate}` and `${lastUpdateTime}` will be replaced
+with the date and time strings, respectively, for the date and time specified by
+the last synchronization timestamp. The date and time strings will be in the
+format required by the [dateGenerate](https://docs.servicenow.com/bundle/utah-api-reference/page/app-store/dev_portal/API_reference/glideSystemScoped/concept/c_GlideSystemScopedAPI.html#title_r_SGSYS-dateGenerate_S_S)
+function and will be converted to strings using the timezone specified in the
+`serverTimezone` parameter.
+
+**Example**
+
+Consider the following YAML.
 
 ```yaml
 ...
@@ -206,6 +386,8 @@ provider:
 mappings:
 - extEntityQuery:
     type: cmdb_ci_email_server
+    query: 'sys_updated_on>javascript:gs.dateGenerate('${lastUpdateDate}','${lastUpdateTime}')^operational_status!=2'
+    serverTimezone: America/Los_Angeles
   entityQuery:
     ...
   match:
@@ -217,9 +399,10 @@ mappings:
 ```
 
 Given this YAML, the ServiceNow CMDB provider will access the URL
-`https://my-service-now.service-now.com/my/api/now/table/cmdb_ci_email_server?sysparm_fields=sys_id,name,sys_class_name,environment&sysparm_limit=50&sysparm_offset=0`
+`https://my-service-now.service-now.com/my/api/now/table/cmdb_ci_email_server?sysparm_fields=sys_id,name,sys_class_name,environment&sysparm_limit=50&sysparm_offset=0&sysparm_query=sys_updated_on%3Ejavascript%3Ags.dateGenerate%28%272023-06-01%27%2C%2712%3A00%3A00%27%29%5Eoperational_status%21%3D2`
 to retrieve the fields `sys_id`, `name`, `sys_class_name`, and `environment` for
-each CI record of type `cmdb_ci_email_server`.
+the CI records of type `cmdb_ci_email_server` that were updated on or after June
+1st, 2023 at 12:00:00 GMT-7 and do not have an `operational_status` of `2`.
 
 ##### New Relic entity query criteria
 
@@ -313,8 +496,15 @@ name of an external entity key, the name of a New Relic entity attribute/tag,
 and an operator used to compare the values of the external entity key to
 the New Relic entity attribute/tag.
 
-The specified external entity key will be added to the list of keys requested
-from the provider for each external entity.
+| Name | Description | Required | Example | Default |
+| --- | --- | --- | --- | --- |
+| `extEntityKey` | The external entity key to use for comparison | Y | `environment` | |
+| `operator` | The type of comparison to use | Y | `equal` | |
+| `entityKey` | The New Relic entity attribute/tag to use for comparison  | Y | `equal` | |
+
+The `extEntityKey` external entity key will be implicitly added to the list of
+keys requested from the provider for each external entity , regardless of whether
+the key is referenced in the [mapping](#mapping) section.
 
 The New Relic entity attribute/tag may be any one of the following.
 
@@ -346,7 +536,7 @@ Given this YAML, New Relic entities will be matched against external entities by
 comparing the values of the tag `bar` on the New Relic entities to the values of
 the key `foo` on the external entities, case insensitively.
 
-##### Tag mapping
+##### Mapping
 
 The `mapping` node of a mapping configuration specifies the mapping from
 external entity keys to New Relic entity tags. The keys of the `mapping` node
