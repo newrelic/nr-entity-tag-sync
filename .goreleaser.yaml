@@ -19,10 +19,11 @@ builds:
       - amd64
     overrides:
       - goos: windows
-        goarch: ''
-        goamd64: ''
-        goarm: ''
-        gomips: ''
+        goarch: "386"
+        flags:
+        - '-tags timetzdata'
+      - goos: windows
+        goarch: amd64
         flags:
         - '-tags timetzdata'
 
