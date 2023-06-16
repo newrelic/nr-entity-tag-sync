@@ -10,8 +10,6 @@ builds:
     main: ./cmd/nr-entity-tag-sync/nr-entity-tag-sync.go
     env:
       - CGO_ENABLED=0
-    flags:
-      - '{{ if eq .CurrentOS "windows" }}-tags=timetzdata{{ end }}'
     goos:
       - linux
       - windows
@@ -19,6 +17,16 @@ builds:
     goarch:
       - "386"
       - amd64
+    overrides:
+      - goos: windows
+        goarch: "386"
+        flags:
+        - '-tags=timetzdata'
+      - goos: windows
+        goarch: amd64
+        goamd64: v1
+        flags:
+        - '-tags=timetzdata'
 
 archives:
   - format: tar.gz
