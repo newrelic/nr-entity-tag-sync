@@ -24,6 +24,7 @@ builds:
         - '-tags=timetzdata'
       - goos: windows
         goarch: amd64
+        goamd64: v1
         flags:
         - '-tags=timetzdata'
 
