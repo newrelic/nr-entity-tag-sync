@@ -120,6 +120,7 @@ dist
 .pnp.*
 
 config.yml
+config-*.yml
 
 dist/
 cf-params.json
