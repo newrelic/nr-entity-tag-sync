@@ -61,6 +61,15 @@ The following providers are supported:
 The ServiceNow CMDB provider models CMDB configuration items (CIs) as external
 entities, enabling fields on CIs to be mapped to tags on New Relic entities.
 
+The ServiceNow CMDB provider leverages the
+[ServiceNow ReST API](https://docs.servicenow.com/bundle/utah-api-reference/page/integrate/inbound-rest/concept/c_RESTAPI.html)
+to retrieve CI data and supports both HTTP Basic authentication and OAuth 2.0
+authentication. See the [ReST API Security](https://docs.servicenow.com/bundle/utah-api-reference/page/integrate/inbound-rest/concept/c_RESTAPI.html#d773849e666)
+documentation for more details on using these authentication methods with the
+ServiceNow ReST API. See the [ServiceNow CMDB provider parameters section](#servicenow-cmdb-provider-parameters)
+for details on how to configure the ServiceNow CMDB provider to use these
+authentication methods.
+
 #### Mappings
 
 Mappings drive the actual synchronization process. Each mapping tells the entity
@@ -316,8 +325,14 @@ The ServiceNow CMDB provider supports the following configuration parmaeters.
 | Name | Environment Variable | Description | Required | Example | Default |
 | --- | --- | --- | --- | --- | --- |
 | `apiUrl` | `NR_CMDB_SNOW_APIURL` | The ServiceNow ReST API URL | Y | https://my-service-now.service-now.com | |
-| `apiUser` | `NR_CMDB_SNOW_APIUSER` | A New Relic User API key | Y | `admin` | |
-| `apiPassword` | `NR_CMDB_SNOW_APIPASSWORD` | A New Relic User API key | Y | `abcd123` | |
+| `authType` | `NR_CMDB_SNOW_AUTHTYPE` | The type of authentication to use to authenticate with the ServiceNow instance (`basic` or `oauth`) | Y | `basic` | `basic` |
+| `apiUser` | `NR_CMDB_SNOW_APIUSER` | The ServiceNow username to use when using `basic` authentication | Y if `authType` is `basic` | `admin` | |
+| `apiPassword` | `NR_CMDB_SNOW_APIPASSWORD` | The password to use for the specified ServiceNow username when using `basic` authentication | Y if `authType` is `basic` | `abcd123` | |
+| `oauthTokenUrl` | `NR_CMDB_SNOW_OAUTHTOKENURL` | The token URL to use when using `oauth` authentication | N | `https://myco.apis.com/auth` | `${apiUrl}/oauth_token.do` |
+| `oauthGrantType` | `NR_CMDB_SNOW_GRANTTYPE` | The grant type to use when using `oauth` authentication | N | `client_credentials` | `password` |
+| `oauthClientId` | `NR_CMDB_SNOW_OAUTHCLIENTID` | The client ID to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
+| `oauthClientSecret` | `NR_CMDB_SNOW_OAUTHCLIENTKEY` | The client secret to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
+| `oauthClientScopes` | `NR_CMDB_SNOW_OAUTHCLIENTKEY` | The list of OAuth scopes to request when using `oauth` authentication | N | `read_profile` | |
 | `pageSize` | `NR_CMDB_SNOW_PAGESIZE` | A New Relic User API key | N | `10` | `10000` |
 
 #### Mapping parameters
