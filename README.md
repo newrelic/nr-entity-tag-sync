@@ -256,8 +256,8 @@ or as an AWS Lambda function.
    for your platform
 2. Extract the archive to a new directory
 3. Create a new configuration file from
-   [the sample configuration file](configs/config.sample.yml)
-4. Set the appropriate environment variables
+   [the sample configuration file](configs/config.sample.yml).Place the configuration file inside 'configs' folder created at same location at CMDB utility executable
+4. Set the appropriate environment variables.'NEW_RELIC_LICENSE_KEY' is a mandatory.
 5. Execute the application
 
 ### AWS Lambda Installation
