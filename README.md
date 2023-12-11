@@ -4,7 +4,7 @@
 
 
 ![GitHub forks](https://img.shields.io/github/forks/newrelic/nr-entity-tag-sync?style=social)
-![GitHub stars](https://img.shields.io/github/stars/newrelic/nr-entity-tag-sync?style=social)
+:![GitHub stars](https://img.shields.io/github/stars/newrelic/nr-entity-tag-sync?style=social)
 ![GitHub watchers](https://img.shields.io/github/watchers/newrelic/nr-entity-tag-sync?style=social)
 
 ![GitHub all releases](https://img.shields.io/github/downloads/newrelic/nr-entity-tag-sync/total)
@@ -255,9 +255,9 @@ or as an AWS Lambda function.
 1. Download [the latest release](https://github.com/newrelic/nr-entity-tag-sync/releases)
    for your platform
 2. Extract the archive to a new directory
-3. Make a copy of config.yml from [the sample configuration file](configs/config.sample.yml) and place it 
-   inside 'configs' folder created at same folder location as the CMDB utility executable.
-4. Set the appropriate environment variables. Environment variable 'NEW_RELIC_LICENSE_KEY' is mandatory.
+3. Create a new configuration file from
+   [the sample configuration file](configs/config.sample.yml)
+4. Set the appropriate environment variables
 5. Execute the application
 
 ### AWS Lambda Installation
