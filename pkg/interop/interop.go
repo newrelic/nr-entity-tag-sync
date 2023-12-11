@@ -54,8 +54,6 @@ func NewInteroperability() (*Interop, error) {
 		return nil, err
   }
 
-  log.Warn(licenseKey)
-
   logger := log.New()
 
   logger.SetLevel(log.WarnLevel)
