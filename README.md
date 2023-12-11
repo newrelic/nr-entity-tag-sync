@@ -4,7 +4,7 @@
 
 
 ![GitHub forks](https://img.shields.io/github/forks/newrelic/nr-entity-tag-sync?style=social)
-:![GitHub stars](https://img.shields.io/github/stars/newrelic/nr-entity-tag-sync?style=social)
+![GitHub stars](https://img.shields.io/github/stars/newrelic/nr-entity-tag-sync?style=social)
 ![GitHub watchers](https://img.shields.io/github/watchers/newrelic/nr-entity-tag-sync?style=social)
 
 ![GitHub all releases](https://img.shields.io/github/downloads/newrelic/nr-entity-tag-sync/total)
