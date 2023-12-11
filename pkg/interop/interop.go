@@ -31,34 +31,42 @@ func ConfigLicenseKey(licenseKey string) nrClient.ConfigOption {
 }
 
 func NewInteroperability() (*Interop, error) {
+
+  viper.SetConfigName("config")
+  viper.AddConfigPath("configs")
+  viper.AddConfigPath(".")
+
+  err := viper.ReadInConfig()
+  if err != nil {
+    return nil, err
+  }
+
+  licenseKey,err := getLicenseKey()
+  if err != nil {
+		return nil, err
+  }
+
   app, err := newrelic.NewApplication(
     newrelic.ConfigAppName("New Relic Entity Tag Sync"),
-    newrelic.ConfigLicense(os.Getenv("NEW_RELIC_LICENSE_KEY")),
+    newrelic.ConfigLicense(licenseKey),
   )
   if err != nil {
 		return nil, err
   }
+
+  log.Warn(licenseKey)
 
   logger := log.New()
 
   logger.SetLevel(log.WarnLevel)
   logger.SetFormatter(nrlogrus.NewFormatter(app, &log.TextFormatter{}))
 
-  viper.SetConfigName("config")
-  viper.AddConfigPath("configs")
-  viper.AddConfigPath(".")
-
-  err = viper.ReadInConfig()
-  if err != nil {
-    return nil, err
-  }
-
   i := &Interop{}
   i.App = app
 
   setupLogging(i, logger)
 
-  err = setupClient(i)
+  err = setupClient(i, licenseKey)
   if err != nil {
     return nil, err
   }
@@ -118,14 +126,19 @@ func setupLogging(i *Interop, logger *log.Logger) {
   i.Logger = logger
 }
 
-func setupClient(i *Interop) error {
+func getLicenseKey()(string, error){
   licenseKey := viper.GetString("licenseKey")
   if licenseKey == "" {
     licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
     if licenseKey == "" {
-      return fmt.Errorf("missing New Relic license key")
+      return "",fmt.Errorf("missing New Relic license key")
     }
   }
+  return licenseKey,nil
+}
+
+
+func setupClient(i *Interop , licenseKey string) error {
 
   apiKey := viper.GetString("apiKey")
   if apiKey == "" {
