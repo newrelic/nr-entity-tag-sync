@@ -360,6 +360,7 @@ entities.
 | --- | --- | --- | --- | --- |
 | `type` | The ServiceNow CMDB configuration item type name | Y | `cmdb_ci_email_server` | |
 | `query` | An [encoded query string](https://docs.servicenow.com/csh?topicname=c_EncodedQueryStrings&version=utah&pubname=utah-platform-user-interface) to use to filter the result using  the `sysparm_query` parameter | N | `sys_updated_on>javascript:gs.dateGenerate('{{ .lastUpdateDate }}','{{ .lastUpdateTime }}')^operational_status!=2` | |
+| `extraQueryParms` | Additional Service Now [query params](https://docs.servicenow.com/bundle/vancouver-api-reference/page/integrate/inbound-rest/concept/c_TableAPI.html) other than `sysparm_query` parameter | N | `&sysparm_display_value=true&sysparm_exclude_reference_link=true` | |
 | `serverTimezone` | A [location name](https://pkg.go.dev/time#LoadLocation) corresponding to a file in the IANA Time Zone database for the time zone of the local ServiceNow instance | N | `America/New_York` | |
 
 The ServiceNow CMDB query is executed by querying the `table` API using a URL
