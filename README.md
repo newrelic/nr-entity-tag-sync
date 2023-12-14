@@ -255,7 +255,7 @@ or as an AWS Lambda function.
 1. Download [the latest release](https://github.com/newrelic/nr-entity-tag-sync/releases)
    for your platform
 2. Extract the archive to a new directory
-3. Make a copy of config.yml from [the sample configuration file](configs/config.sample.yml) and place it 
+3. Make a copy of config.yml from [the sample configuration file](configs/config.sample.yml) and place it
    inside 'configs' folder created at same folder location as the CMDB utility executable.
 4. Set the appropriate environment variables. Environment variable 'NEW_RELIC_LICENSE_KEY' is mandatory.
 5. Execute the application
