@@ -165,9 +165,9 @@ func (snp *ServiceNowProvider) GetEntities(
 		newTags = append(newTags, tag)
 	}
 
-	ciextraQueryParms := cast.ToString(config["extraqueryparms"])
+	ciOptionalParams := cast.ToString(config["optionalparams"])
 
-	items, err := snp.getRecords(ciType, ciQuery, ciextraQueryParms, newTags)
+	items, err := snp.getRecords(ciType, ciQuery, ciOptionalParams, newTags)
 	if err != nil {
 		return nil, fmt.Errorf("get records failed: %s", err)
 	}

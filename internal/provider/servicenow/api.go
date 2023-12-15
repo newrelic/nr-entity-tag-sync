@@ -90,7 +90,7 @@ func (snp *ServiceNowProvider) getPaginatedResults(
 func (snp *ServiceNowProvider) getRecords(
 	tableName string,
 	query string,
-	extraQueryParms string,
+	optionalParams string,
 	fields []string,
 ) (
 	[]map[string]interface{},
@@ -119,8 +119,10 @@ func (snp *ServiceNowProvider) getRecords(
 		sysparmQuery,
 	)
 
-	if extraQueryParms != "" {
-		url = url+ extraQueryParms
+	if optionalParams != "" {
+		url = fmt.Sprintf("%s&%s",
+		url,
+		optionalParams)
 	}
 
 	for !done {
@@ -140,6 +142,7 @@ func (snp *ServiceNowProvider) getRecords(
 
 		url = nextUrl
 	}
+
 	return results, nil
 }
 
