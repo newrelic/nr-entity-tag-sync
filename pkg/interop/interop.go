@@ -1,56 +1,61 @@
 package interop
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"time"
+  "context"
+  "fmt"
+  "os"
+  "time"
 
-	"github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrlogrus"
-	"github.com/newrelic/go-agent/v3/newrelic"
-	nrClient "github.com/newrelic/newrelic-client-go/newrelic"
-	"github.com/newrelic/newrelic-client-go/pkg/config"
-	"github.com/newrelic/newrelic-client-go/pkg/logging"
-	"github.com/newrelic/newrelic-client-go/pkg/region"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+  "github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrlogrus"
+  "github.com/newrelic/go-agent/v3/newrelic"
+  nrClient "github.com/newrelic/newrelic-client-go/newrelic"
+  "github.com/newrelic/newrelic-client-go/pkg/config"
+  "github.com/newrelic/newrelic-client-go/pkg/logging"
+  "github.com/newrelic/newrelic-client-go/pkg/region"
+  log "github.com/sirupsen/logrus"
+  "github.com/spf13/viper"
 )
 
 type Interop struct {
-  App               *newrelic.Application
-  Logger            *log.Logger
-  NrClient          *nrClient.NewRelic
-  eventsEnabled     bool
+  App           *newrelic.Application
+  Logger        *log.Logger
+  NrClient      *nrClient.NewRelic
+  eventsEnabled bool
 }
 
 func ConfigLicenseKey(licenseKey string) nrClient.ConfigOption {
-	return func(cfg *config.Config) error {
-		cfg.LicenseKey = licenseKey
-		return nil
-	}
+  return func(cfg *config.Config) error {
+    cfg.LicenseKey = licenseKey
+    return nil
+  }
 }
 
 func NewInteroperability() (*Interop, error) {
-  app, err := newrelic.NewApplication(
-    newrelic.ConfigAppName("New Relic Entity Tag Sync"),
-    newrelic.ConfigLicense(os.Getenv("NEW_RELIC_LICENSE_KEY")),
-  )
-  if err != nil {
-		return nil, err
-  }
-
-  logger := log.New()
-
-  logger.SetLevel(log.WarnLevel)
-  logger.SetFormatter(nrlogrus.NewFormatter(app, &log.TextFormatter{}))
-
+  // Load configuration with viper
   viper.SetConfigName("config")
   viper.AddConfigPath("configs")
   viper.AddConfigPath(".")
-
-  err = viper.ReadInConfig()
+  err := viper.ReadInConfig()
   if err != nil {
     return nil, err
+  }
+
+  // Look for our license key
+  licenseKey := viper.GetString("licenseKey")
+  if licenseKey == "" {
+    licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
+  }
+
+  // We don't care if this fails, the Agent is nil safe
+  app, _ := newrelic.NewApplication(
+    newrelic.ConfigAppName("New Relic Entity Tag Sync"),
+    newrelic.ConfigLicense(licenseKey),
+  )
+
+  logger := log.New()
+  logger.SetLevel(log.WarnLevel)
+  if app != nil {
+    logger.SetFormatter(nrlogrus.NewFormatter(app, &log.TextFormatter{}))
   }
 
   i := &Interop{}
