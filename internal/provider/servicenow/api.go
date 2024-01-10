@@ -90,6 +90,7 @@ func (snp *ServiceNowProvider) getPaginatedResults(
 func (snp *ServiceNowProvider) getRecords(
 	tableName string,
 	query string,
+	urlQueryParams map[string]string,
 	fields []string,
 ) (
 	[]map[string]interface{},
@@ -110,11 +111,12 @@ func (snp *ServiceNowProvider) getRecords(
 	}
 
 	url := fmt.Sprintf(
-		"%s/api/now/table/%s?sysparm_fields=sys_id,%s&sysparm_limit=%d&sysparm_offset=0%s",
+		"%s/api/now/table/%s?sysparm_fields=sys_id,%s&sysparm_limit=%d&sysparm_offset=0%s%s",
 		snp.ApiURL,
 		tableName,
 		strings.Join(fields, ","),
 		snp.PageSize,
+		buildUrlQueryParamString(urlQueryParams),
 		sysparmQuery,
 	)
 
@@ -182,4 +184,21 @@ func (snp *ServiceNowProvider) createHttpClient() (*http.Client, error) {
 	}
 
 	return &http.Client{}, nil
+}
+
+func buildUrlQueryParamString(urlQueryParams map[string]string) string {
+	if len(urlQueryParams) == 0 {
+		return ""
+	}
+
+	params := []string{}
+
+	for k, v := range urlQueryParams {
+		params = append(
+			params,
+			url.QueryEscape(k)+"="+url.QueryEscape(v),
+		)
+	}
+
+	return "&" + strings.Join(params, "&")
 }
