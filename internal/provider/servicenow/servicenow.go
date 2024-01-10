@@ -155,6 +155,12 @@ func (snp *ServiceNowProvider) GetEntities(
 		}
 	}
 
+	var urlQueryParams map[string]string
+
+	if v, ok := config["urlqueryparams"]; ok {
+		urlQueryParams = cast.ToStringMapString(v)
+	}
+
 	newTags := []string{}
 
 	for _, tag := range tags {
@@ -165,7 +171,7 @@ func (snp *ServiceNowProvider) GetEntities(
 		newTags = append(newTags, tag)
 	}
 
-	items, err := snp.getRecords(ciType, ciQuery, newTags)
+	items, err := snp.getRecords(ciType, ciQuery, urlQueryParams, newTags)
 	if err != nil {
 		return nil, fmt.Errorf("get records failed: %s", err)
 	}

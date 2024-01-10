@@ -361,6 +361,7 @@ entities.
 | `type` | The ServiceNow CMDB configuration item type name | Y | `cmdb_ci_email_server` | |
 | `query` | An [encoded query string](https://docs.servicenow.com/csh?topicname=c_EncodedQueryStrings&version=utah&pubname=utah-platform-user-interface) to use to filter the result using  the `sysparm_query` parameter | N | `sys_updated_on>javascript:gs.dateGenerate('{{ .lastUpdateDate }}','{{ .lastUpdateTime }}')^operational_status!=2` | |
 | `serverTimezone` | A [location name](https://pkg.go.dev/time#LoadLocation) corresponding to a file in the IANA Time Zone database for the time zone of the local ServiceNow instance | N | `America/New_York` | |
+| `urlQueryParams` | Additional URL query parameters to send on the ReST `table` API call specified as a set of key + value pairs | N | (see below) | |
 
 The ServiceNow CMDB query is executed by querying the `table` API using a URL
 like the following.
@@ -389,6 +390,13 @@ format required by the [dateGenerate](https://docs.servicenow.com/bundle/utah-ap
 function and will be converted to strings using the timezone specified in the
 `serverTimezone` parameter.
 
+The `query` configuration parameter should not be confused with the
+`urlQueryParameters` configuration parameter. The former is used to specify an
+[encoded query string](https://docs.servicenow.com/csh?topicname=c_EncodedQueryStrings&version=utah&pubname=utah-platform-user-interface)
+used to filter the ServiceNow query result set. The latter is used to specify
+additional query parameters to add to the ReST API URL generated to execute the
+`table` API query.
+
 **Example**
 
 Consider the following YAML.
@@ -403,6 +411,8 @@ mappings:
     type: cmdb_ci_email_server
     query: 'sys_updated_on>javascript:gs.dateGenerate('${lastUpdateDate}','${lastUpdateTime}')^operational_status!=2'
     serverTimezone: America/Los_Angeles
+    urlQueryParams:
+      sysparm_display_value: "true"
   entityQuery:
     ...
   match:
@@ -414,10 +424,11 @@ mappings:
 ```
 
 Given this YAML, the ServiceNow CMDB provider will access the URL
-`https://my-service-now.service-now.com/my/api/now/table/cmdb_ci_email_server?sysparm_fields=sys_id,name,sys_class_name,environment&sysparm_limit=50&sysparm_offset=0&sysparm_query=sys_updated_on%3Ejavascript%3Ags.dateGenerate%28%272023-06-01%27%2C%2712%3A00%3A00%27%29%5Eoperational_status%21%3D2`
-to retrieve the fields `sys_id`, `name`, `sys_class_name`, and `environment` for
-the CI records of type `cmdb_ci_email_server` that were updated on or after June
-1st, 2023 at 12:00:00 GMT-7 and do not have an `operational_status` of `2`.
+`https://my-service-now.service-now.com/my/api/now/table/cmdb_ci_email_server?sysparm_fields=sys_id,name,sys_class_name,environment&sysparm_limit=50&sysparm_offset=0&sysparm_display_value=true&sysparm_query=sys_updated_on%3Ejavascript%3Ags.dateGenerate%28%272023-06-01%27%2C%2712%3A00%3A00%27%29%5Eoperational_status%21%3D2`
+to retrieve the *display values* for the fields `sys_id`, `name`,
+`sys_class_name`, and `environment` for the CI records of type
+`cmdb_ci_email_server` that were updated on or after
+June 1st, 2023 at 12:00:00 GMT-7 and do not have an `operational_status` of `2`.
 
 ##### New Relic entity query criteria
 
@@ -881,7 +892,7 @@ certain GitHub events.
 
 TBD
 
-# Support
+## Support
 
 New Relic has open-sourced this project. This project is provided AS-IS WITHOUT
 WARRANTY OR DEDICATED SUPPORT. Issues and contributions should be reported to
@@ -891,7 +902,7 @@ We encourage you to bring your experiences and questions to the
 [Explorers Hub](https://discuss.newrelic.com/) where our community members
 collaborate on solutions and new ideas.
 
-## Privacy
+### Privacy
 
 At New Relic we take your privacy and the security of your information
 seriously, and are committed to protecting your information. We must emphasize
@@ -905,7 +916,7 @@ code or zip code, Device ID, IP address, and email address.
 
 For more information, review [New Relic’s General Data Privacy Notice](https://newrelic.com/termsandconditions/privacy).
 
-## Contribute
+### Contribute
 
 We encourage your contributions to improve this project! Keep in mind that
 when you submit your pull request, you'll need to sign the CLA via the
@@ -932,7 +943,7 @@ If you would like to contribute to this project, review [these guidelines](./CON
 To all contributors, we thank you!  Without your contribution, this project
 would not be what it is today.
 
-## License
+### License
 
-The [New Relic Integration for Conviva] is licensed under the
+The [New Relic Entity Tag Sync] project is licensed under the
 [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
