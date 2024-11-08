@@ -116,6 +116,7 @@ func New(i *interop.Interop, v *viper.Viper) (provider.Provider, error) {
 			oauthClientScopes = []string{}
 		}
 
+		snp.OAuthGrantType = grantType
 		snp.OAuthTokenURL = oauthTokenUrl
 		snp.OAuthClientID = oauthClientId
 		snp.OAuthClientSecret = oauthClientSecret
