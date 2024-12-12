@@ -119,7 +119,12 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Binary directory
+bin
+
+# Config and local files
 config.yml
+config.yaml
 *.local.*
 
 dist/

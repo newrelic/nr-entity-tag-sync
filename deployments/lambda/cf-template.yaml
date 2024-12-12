@@ -1,0 +1,261 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for deploying the AWS Lambda Function.
+
+Parameters:
+  #
+  # ARN of the lambda execution role used to execute the lambda.
+  #
+  ExecRoleArn:
+    Type: String
+    Description: ARN of the IAM role used for lambda execution.
+    AllowedPattern: '^arn:(aws[a-zA-Z-]*)?:iam::\d{12}:role/?[a-zA-Z_0-9+=,.@\-_/]+$'
+  #
+  # Name of the lambda function.
+  #
+  FunctionName:
+    Type: String
+    Description: Name of the lambda function.
+    Default: NewRelicEntityTagSync
+  #
+  # Timeout (in seconds) for the lambda function.
+  #
+  FunctionTimeout:
+    Type: Number
+    Description: Timeout (in seconds) for the lambda function.
+    MinValue: 1
+    MaxValue: 900
+    Default: 60
+  #
+  # Memory size for the lambda function.
+  #
+  FunctionMemorySize:
+    Type: Number
+    Description: Memory size for the lambda function.
+    MinValue: 128
+    MaxValue: 10240
+    Default: 256
+  #
+  # S3 Bucket name holding the deployment package
+  #
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket holding the deployment package .zip file.
+    AllowedPattern: '^[0-9A-Za-z\.\-_]*(?<!\.)$'
+  #
+  # S3 Bucket key of the deployment package S3 object
+  #
+  S3BucketKey:
+    Type: String
+    Description: Key of the deployment package .zip file S3 object.
+    Default: nr-entity-tag-sync.zip
+  #
+  # New Relic license key for the APM Go agent.
+  #
+  NewRelicLicenseKey:
+    Type: String
+    Description: Your New Relic license key.
+    AllowedPattern: '[a-zA-Z0-9\-_]*'
+    Default: ''
+  #
+  # New Relic region for ingest
+  #
+  NewRelicRegion:
+    Type: String
+    Description: The region of your New Relic account.
+    AllowedPattern: 'US|EU'
+    Default: 'US'
+  #
+  # New Relic APM application name used by the APM Go agent
+  #
+  NewRelicApmAppName:
+    Type: String
+    Description: New Relic APM application name.
+    AllowedPattern: '[a-zA-Z0-9\-_ \.]*'
+    Default: 'New Relic Entity Tag Sync Lambda'
+  #
+  # New Relic User API key used for GraphQL Nerdstorage queries and mutations.
+  #
+  NewRelicApiKey:
+    Type: String
+    Description: The New Relic User API key to use.
+    AllowedPattern: '[a-zA-Z0-9._\-]*'
+  #
+  # Service Now API URL used by the Service Now provider.
+  #
+  SnowApiUrl:
+    Type: String
+    Description: The Service Now API URL.
+    Default: ''
+  #
+  # Service Now API authentication type used by the Service Now provider.
+  #
+  SnowApiAuthType:
+    Type: String
+    Description: The Service Now API authentication type.
+    AllowedPattern: 'basic|oauth'
+    Default: 'basic'
+  #
+  # Service Now API user name used by the Service Now provider when using basic
+  # authentication or when using the password grant type with OAuth 2.0
+  # authentication.
+  #
+  SnowApiUser:
+    Type: String
+    Description: The Service Now API user to use with basic authentication or with the OAuth 2.0 password grant type.
+    Default: ''
+  #
+  # Service Now API password used by the Service Now provider when using basic
+  # authentication or when using the password grant type with OAuth 2.0
+  # authentication.
+  #
+  SnowApiPassword:
+    Type: String
+    Description: The Service Now API password to use with basic authentication or with the OAuth 2.0 password grant type.
+    Default: ''
+  #
+  # Service Now API OAuth 2.0 token URL used by the Service Now provider when
+  # using OAuth 2.0 authentication.
+  #
+  SnowApiOAuthTokenUrl:
+    Type: String
+    Description: The Service Now OAuth 2.0 token URL to use when using OAuth 2.0 authentication.
+    Default: ''
+  #
+  # Service Now API OAuth 2.0 grant type used by the Service Now provider when
+  # using OAuth 2.0 authentication.
+  #
+  SnowApiOAuthGrantType:
+    Type: String
+    Description: The Service Now OAuth 2.0 grant type to use when using OAuth 2.0 authentication.
+    Default: ''
+  #
+  # Service Now API OAuth 2.0 client ID used by the Service Now provider when
+  # using OAuth 2.0 authentication.
+  #
+  SnowApiOAuthClientId:
+    Type: String
+    Description: The Service Now OAuth 2.0 client ID to use when using OAuth 2.0 authentication.
+    Default: ''
+  #
+  # Service Now API OAuth 2.0 client secret used by the Service Now provider
+  # when using OAuth 2.0 authentication.
+  #
+  SnowApiOAuthClientSecret:
+    Type: String
+    Description: The Service Now OAuth 2.0 client secret to use when using OAuth 2.0 authentication.
+    Default: ''
+  #
+  # Service Now API OAuth 2.0 client scopes used by the Service Now provider
+  # when using OAuth 2.0 authentication. Separate multiple scopes with one or
+  # more whitespace characters. To use scope names which contain whitespaces,
+  # specify the scopes in the `config.yml` file.
+  #
+  SnowApiOAuthClientScopes:
+    Type: String
+    Description: The Service Now OAuth 2.0 client scopes to use when using OAuth 2.0 authentication.
+    Default: ''
+  #
+  # CRON expression that specifies the schedule on which the lambda function
+  # should be invoked by the EventBridge scheduler.
+  #
+  ScheduleExpression:
+    Type: String
+    Description: The CRON expression that specifies the schedule on which the lambda function should be invoked by the EventBridge scheduler.
+    Default: 'cron(*/15 * * * ? *)'
+
+Resources:
+
+  #
+  # The lambda.
+  #
+
+  NewRelicEntityTagSyncLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      PackageType: Zip
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref S3BucketKey
+      Role: !Ref ExecRoleArn
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Description: A lambda for syncing tags between external entities and New Relic entities.
+      FunctionName: !Ref FunctionName
+      Timeout: !Ref FunctionTimeout
+      MemorySize: !Ref FunctionMemorySize
+      Environment:
+        Variables:
+          # New Relic variables
+          NEW_RELIC_LICENSE_KEY: !Ref NewRelicLicenseKey
+          NEW_RELIC_REGION: !Ref NewRelicRegion
+          NEW_RELIC_APP_NAME: !Ref NewRelicApmAppName
+          NEW_RELIC_API_KEY: !Ref NewRelicApiKey
+
+          # Service Now variables
+          NR_CMDB_SNOW_APIURL: !Ref SnowApiUrl
+          NR_CMDB_SNOW_AUTHTYPE: !Ref SnowApiAuthType
+          NR_CMDB_SNOW_APIUSER: !Ref SnowApiUser
+          NR_CMDB_SNOW_APIPASSWORD: !Ref SnowApiPassword
+          NR_CMDB_SNOW_OAUTHTOKENURL: !Ref SnowApiOAuthTokenUrl
+          NR_CMDB_SNOW_OAUTHGRANTTYPE: !Ref SnowApiOAuthGrantType
+          NR_CMDB_SNOW_OAUTHCLIENTID: !Ref SnowApiOAuthClientId
+          NR_CMDB_SNOW_OAUTHCLIENTSECRET: !Ref SnowApiOAuthClientSecret
+          NR_CMDB_SNOW_OAUTHCLIENTSCOPES: !Ref SnowApiOAuthClientScopes
+
+  #
+  # Execution role used by EventBridge to execute the Entity Tag Sync lambda.
+  #
+
+  NewRelicEntityTagSyncLambdaEventBridgeExecRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - scheduler.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: Execution role for the Entity Tag Sync lambda target invocation.
+      Policies:
+      - PolicyName: InvokeEntityTagSyncLambda
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+              - 'lambda:InvokeFunction'
+              Resource:
+              - !GetAtt NewRelicEntityTagSyncLambda.Arn
+      RoleName: NewRelicEntityTagSyncLambda-EventBridgeExecRole
+
+  #
+  # The EventBridge schedule group for the Entity Tag Sync lambda schedule.
+  #
+
+  NewRelicEntityTagSyncLambdaEventBridgeScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: NewRelicEntityTagSyncLambda-EventBridgeScheduleGroup
+
+  #
+  # The EventBridge schedule that will invoke the Entity Tag Sync lambda.
+  #
+
+  NewRelicEntityTagSyncLambdaEventBridgeSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: This schedule will invoke the Entity Tag Sync lambda.
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      GroupName: !Ref NewRelicEntityTagSyncLambdaEventBridgeScheduleGroup
+      Name: NewRelicEntityTagSyncLambda-EventBridgeSchedule
+      ScheduleExpression: !Ref ScheduleExpression
+      ScheduleExpressionTimezone: UTC
+      State: ENABLED
+      Target:
+        Arn: !GetAtt NewRelicEntityTagSyncLambda.Arn
+        Input: "{}"
+        RoleArn: !GetAtt NewRelicEntityTagSyncLambdaEventBridgeExecRole.Arn

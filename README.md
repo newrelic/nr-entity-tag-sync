@@ -245,24 +245,261 @@ The timestamp of the last synchronization is determined by querying NRDB for the
 latest timestamp of the most recent audit event. This is why
 [audit events](#audit-events)must be enabled in order to leverage this feature.
 
-## Installation
+## Getting Started
 
-The New Relic Entity Tag Sync application can be run as a standalone application
-or as an AWS Lambda function.
+The New Relic Entity Tag Sync application can be run directly [on a host](#on-host)
+or [run as an AWS Lambda function](#aws-lambda-function).
 
-### Standalone Installation
+### On-host
 
-1. Download [the latest release](https://github.com/newrelic/nr-entity-tag-sync/releases)
-   for your platform
-2. Extract the archive to a new directory
-3. Make a copy of config.yml from [the sample configuration file](configs/config.sample.yml) and place it
-   inside 'configs' folder created at same folder location as the CMDB utility executable.
-4. Set the appropriate environment variables. Environment variable 'NEW_RELIC_LICENSE_KEY' is mandatory.
-5. Execute the application
+The New Relic Entity Tag Sync application provides binaries for the following
+host environments.
 
-### AWS Lambda Installation
+* [Linux x86](https://github.com/newrelic/nr-entity-tag-sync/releases/latest/download/nr-entity-tag-sync_Linux_i386.tar.gz)
+* [Linux amd64](https://github.com/newrelic/nr-entity-tag-sync/releases/latest/download/nr-entity-tag-sync_Linux_x86_64.tar.gz)
+* [Windows x86](https://github.com/newrelic/nr-entity-tag-sync/releases/latest/download/nr-entity-tag-sync_Windows_i386.zip)
+* [Windows amd64](https://github.com/newrelic/nr-entity-tag-sync/releases/latest/download/nr-entity-tag-sync_Windows_x86_64.zip)
 
-TODO
+#### Run the application on host
+
+To run the New Relic Entity Tag Sync application as a standalone application on
+a host, perform the following steps.
+
+1. Download the binary for your platform from
+   [the latest release](https://github.com/newrelic/nr-entity-tag-sync/releases/latest)
+1. Extract the archive to a new or existing directory.
+1. Create a directory named `configs` in the same directory.
+1. To use an existing configuration file, copy it to a file named [`config.yml`](#configuration)
+   in the new `configs` directory. To create a new configuration file, copy the
+   [`configs/config.sample.yml`](./configs/config.sample.yml).
+   to `configs/config.yml` and customize it to [configure](#configuration) the
+   application appropriately for your environment.
+1. Optionally, to specify one or more [configuration](#configuration) parameters
+   using environment variables, set the appropriate environment variables.
+1. From the directory where the archive was extracted, execute the integration
+   binary using the command `./nr-entity-tag-sync` (or
+   `.\nr-entity-tag-sync.exe` on Windows).
+
+### AWS Lambda Function
+
+To run the New Relic Entity Tag Sync application as an [AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html)
+function, create an AWS Lambda function using one of the following methods.
+
+* [Use the included deployment scripts](#deploy-using-the-deployment-scripts)
+* [Integrate with an existing provisioning process](#deploy-using-an-existing-provisioning-process)
+
+#### Requirements for running the AWS Lambda Function
+
+* The Entity Tag Sync Lambda function requires an execution role that the AWS
+  Lambda service can assume to run the Lambda function. Either an existing role
+  can be used or a new role can be created.
+
+  When creating a new role, the Entity Tag Sync Lambda function does not need
+  access to any AWS services other than [CloudWatch](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html)
+  (to write log events). Attaching the
+  [AWSLambdaExecute](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AWSLambdaExecute.html)
+  managed policy or the [AWSLambdaBasicExecutionRole](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AWSLambdaBasicExecutionRole.html)
+  managed policy or the equivalent thereof, is sufficient.
+
+#### Deploy using the deployment scripts
+
+A [deployment script](./scripts/lambda/deploy.sh) is included that can be run
+using the included [`Makefile`](./Makefile) to build the [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/golang-package.html)
+and deploy the Entity Tag Sync Lambda function as part of a new
+[AWS Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html)
+in one step.
+
+[The provided CloudFormation template](./deployments/lambda/cf-template.yaml)
+will create a new [AWS Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html)
+with four resources.
+
+1. The Entity Tag Sync Lambda function
+1. An [EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html)
+   [schedule](https://docs.aws.amazon.com/eventbridge/latest/userguide/using-eventbridge-scheduler.html)
+   that will invoke the Entity Tag Sync Lambda function every 15 minutes
+   starting at the beginning of each hour
+1. An [EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html)
+   schedule group to contain the schedule
+1. An [IAM role](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html)
+   that the [EventBridge scheduler](https://docs.aws.amazon.com/eventbridge/latest/userguide/using-eventbridge-scheduler.html)
+   can assume to execute the Entity Tag Sync Lambda function
+
+The only _required_ resource in this [AWS Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html)
+is the Entity Tag Sync Lambda function. The [EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html)
+resources and the [IAM role](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html)
+can be removed from the template if existing resources will be used and/or if
+the Entity Tag Sync Lambda function will be invoked as the target of a different
+resource.
+
+[The provided CloudFormation template](./deployments/lambda/cf-template.yaml)
+leverages [CloudFormation template parameters](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html)
+to customize various properties of the created resources. A [sample parameters file](./deployments/lambda/cf-params.sample.json)
+is provided that shows an example of each parameter that can be used with the
+CloudFormation template.
+
+**NOTE:** Deploying the Entity Tag Sync Lambda function using the deployment
+scripts requires the [AWS CLI](https://aws.amazon.com/cli/) to be installed on
+the same system where the repository was cloned. It also requires an S3 bucket
+where the [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/golang-package.html)
+can be uploaded so that the [CloudFormation template](./deployments/lambda/cf-template.yaml)
+can reference it to during deployment. Either an existing bucket can be used or
+a new bucket can be created.
+
+To deploy the Entity Tag Sync Lambda function using this method, perform the
+following steps.
+
+1. Clone this repository using [`git clone`](https://git-scm.com/docs/git-clone).
+1. Navigate to the repository root.
+1. To use an existing configuration file, copy it to a file named [`config.yml`](#configuration)
+   in the `configs` directory. To create a new configuration file, copy the
+   [`configs/config.sample.yml`](./configs/config.sample.yml) to
+   `configs/config.yml` and customize it to [configure](#configuration) the
+   application appropriately for your environment.
+1. Copy the [`deployments/lambda/cf-params.sample.json`](./deployments/lambda/cf-params.sample.json)
+   to `deployments/lambda/cf-params.json`.
+1. Use the parameter descriptions in the CloudFormation template at
+   [`deployments/lambda/cf-template.yaml`](./deployments/lambda/cf-template.yaml)
+   as a guide to update the template parameters in
+   `deployments/lambda/cf-params.json`.
+1. Ensure that appropriate [authentication and access credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-authentication.html)
+   are set to allow the AWS CLI to authenticate.
+1. Run the command `AWS_S3_BUCKET_NAME=my-s3-bucket make deploy-lambda`, where
+   `my-s3-bucket` is the same as the value of the `S3BucketName` template
+   parameter that is set in the `deployments/lambda/cf-params.json` file.
+1. Verify that the command ran successfully by looking for the following console
+   output.
+
+```bash
+...
+Building lambda zip package...
+  adding: bootstrap (deflated 51%)
+  adding: configs/ (stored 0%)
+  adding: configs/config.yml (deflated 43%)
+Uploading lambda zip package...
+upload: ../nr-entity-tag-sync.zip to s3://YOUR_BUCKET_NAME/nr-entity-tag-sync.zip
+Deploying stack nr-entity-tag-sync...
+
+Waiting for changeset to be created..
+Waiting for stack create/update to complete
+Successfully created/updated stack - nr-entity-tag-sync
+Done.
+```
+
+##### Update or uninstall using the deployment scripts
+
+An [update script](./scripts/lambda/update.sh) is included that can be run using
+the included [`Makefile`](./Makefile) to update the Entity Tag Sync Lambda
+binary or the [`config.yml`](#configuration) file. This can be useful to update
+to the latest version of the Entity Tag Sync application or deploy a new [`config.yml`](#configuration)
+file.
+
+To update to the latest version of the Entity Tag Sync application, perform the
+following steps.
+
+1. Navigate to the repository root.
+1. Update your repository to the latest version using [`git pull`](https://git-scm.com/docs/git-pull),
+   [`git rebase`](https://git-scm.com/docs/git-rebase), etc.
+1. Run the command `AWS_S3_BUCKET_NAME=my-s3-bucket make update-lambda`, where
+   `my-s3-bucket` is the name of an S3 bucket to upload the
+   [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/golang-package.html)
+   to.
+1. Verify that the command ran successfully by looking for the following console
+   output.
+
+```bash
+...
+Building lambda zip package...
+  adding: bootstrap (deflated 51%)
+  adding: configs/ (stored 0%)
+  adding: configs/config.yml (deflated 43%)
+Uploading lambda zip package...
+upload: ../nr-entity-tag-sync.zip to s3://YOUR_BUCKET_NAME/nr-entity-tag-sync.zip
+Done.
+```
+
+To deploy a new [`config.yml`](#configuration), perform the following steps.
+
+1. Navigate to the repository root.
+1. Copy the new [`config.yml`](#configuration) file to the  `configs`
+   directory or update the existing [`config.yml`](#configuration) file in the
+   `configs` directory.
+1. Run the command `AWS_S3_BUCKET_NAME=my-s3-bucket make update-lambda`, where
+   `my-s3-bucket`  is the name of an S3 bucket to upload the
+   [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/golang-package.html)
+   to.
+1. Verify that the command ran successfully by looking for the console output
+   shown above.
+
+An [uninstall script](./scripts/lambda/delete.sh) is also included that can be
+run using the included [`Makefile`](./Makefile) to remove the Entity Tag Sync
+[AWS Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html)
+that was deployed using the [deploy script](./scripts/lambda/deploy.sh).
+
+To uninstall the Entity Tag Sync [AWS Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html),
+perform the following steps.
+
+1. Navigate to the repository root.
+1. Run the command `make delete-lambda`.
+1. Verify that the command ran successfully by looking for the following console
+   output.
+
+```bash
+...
+Deleting stack nr-entity-tag-sync...
+Waiting for stack delete to complete...
+Done.
+```
+
+#### Deploy using an existing provisioning process
+
+To use an existing provisioning process such as [CloudFormation](https://aws.amazon.com/cloudformation/),
+[Terraform](https://www.terraform.io/), or [Ansible](https://docs.ansible.com/)
+to deploy the Entity Tag Sync Lambda, build the [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/golang-package.html)
+and use the appropriate mechanisms of the provisioning tool(s) to create an
+[AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html)
+function with the properties shown below.
+
+To build the [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/golang-package.html)
+perform the following steps.
+
+1. Clone this repository using [`git clone`](https://git-scm.com/docs/git-clone).
+1. Navigate to the repository root.
+1. To use an existing configuration file, copy it to a file named [`config.yml`](#configuration)
+   in the `configs` directory. To create a new configuration file, copy the
+   [`configs/config.sample.yml`](./configs/config.sample.yml) to
+   `configs/config.yml` and customize it to [configure](#configuration) the
+   application appropriately for your environment.
+1. Run the command `make package-lambda`.
+1. Verify that the command ran successfully by looking for the following console
+   output.
+
+```bash
+...
+Building lambda zip package...
+  adding: bootstrap (deflated 51%)
+  adding: configs/ (stored 0%)
+  adding: configs/config.yml (deflated 43%)
+```
+
+On successful completion of the `make` command, the deployment package will be
+located at `dist/nr-entity-tag-sync.zip`. Use this deployment package
+along with the following property values to create the AWS Lambda function.
+
+* Lambda package type: `Zip`
+* Lambda deployment package: Reference to the location of the generated
+  deployment package ZIP file
+* Lambda entry point/handler name: `bootstrap`
+* Lambda runtime identifier: `provided.al2023`
+* Lambda environment variables: Specify [configuration](#configuration)
+  parameters that should be set using environment variables.
+
+#### Run the application as an AWS Lambda Function
+
+The application can be run using any supported [invocation method](https://docs.aws.amazon.com/lambda/latest/dg/lambda-invocation.html).
+For example, when deploying the AWS Lambda function using [the provided CloudFormation template](./deployments/lambda/cf-template.yaml),
+an [AWS EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html)
+[schedule](https://docs.aws.amazon.com/eventbridge/latest/userguide/using-eventbridge-scheduler.html)
+is also created to invoke the AWS Lambda function on a specified schedule.
 
 ## Usage
 
@@ -297,11 +534,6 @@ log:
 | `events.accountId` | `NEW_RELIC_ACCOUNT_ID` | New Relic account where [audit events](#audit-events) are posted | Y if events enabled | `12345` | |
 | `events.eventName` | | Name of [audit event](#audit-events) type | N | `MyCustomTagSyncEvent` | `EntityTagSync` |
 
-**NOTE:** The `licenseKey` parameter in the configuration file can *not* be used
-for configuring the Go APM agent that is used to instrument the app. The Go APM
-agent bootstraps before the configuration is read and therefore the
-`NEW_RELIC_LICENSE_KEY` environment variable must be used for this purpose.
-
 #### Provider parameters
 
 The `provider` section of the configuration file is used to specify the
@@ -331,8 +563,8 @@ The ServiceNow CMDB provider supports the following configuration parmaeters.
 | `oauthTokenUrl` | `NR_CMDB_SNOW_OAUTHTOKENURL` | The token URL to use when using `oauth` authentication | N | `https://myco.apis.com/auth` | `${apiUrl}/oauth_token.do` |
 | `oauthGrantType` | `NR_CMDB_SNOW_GRANTTYPE` | The grant type to use when using `oauth` authentication | N | `client_credentials` | `password` |
 | `oauthClientId` | `NR_CMDB_SNOW_OAUTHCLIENTID` | The client ID to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
-| `oauthClientSecret` | `NR_CMDB_SNOW_OAUTHCLIENTKEY` | The client secret to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
-| `oauthClientScopes` | `NR_CMDB_SNOW_OAUTHCLIENTKEY` | The list of OAuth scopes to request when using `oauth` authentication | N | `read_profile` | |
+| `oauthClientSecret` | `NR_CMDB_SNOW_OAUTHCLIENTSECRET` | The client secret to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
+| `oauthClientScopes` | `NR_CMDB_SNOW_OAUTHCLIENTSCOPES` | The list of OAuth scopes to request when using `oauth` authentication. Separate multiple scopes using whitespace characters. | N | `read_profile` | |
 | `pageSize` | `NR_CMDB_SNOW_PAGESIZE` | A New Relic User API key | N | `10` | `10000` |
 
 #### Mapping parameters
