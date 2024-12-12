@@ -1,0 +1,82 @@
+[
+    {
+        "ParameterKey": "ExecRoleArn",
+        "ParameterValue": "arn:aws:iam::12345:role/my-execute-lambda-role"
+    },
+    {
+        "ParameterKey": "FunctionName",
+        "ParameterValue": "NewRelicEntityTagSync"
+    },
+    {
+        "ParameterKey": "FunctionTimeout",
+        "ParameterValue": "60"
+    },
+    {
+        "ParameterKey": "FunctionMemorySize",
+        "ParameterValue": "256"
+    },
+    {
+        "ParameterKey": "S3BucketName",
+        "ParameterValue": "my-bucket"
+    },
+    {
+        "ParameterKey": "S3BucketKey",
+        "ParameterValue": "nr-entity-tag-sync.zip"
+    },
+    {
+        "ParameterKey": "NewRelicLicenseKey",
+        "ParameterValue": "123456"
+    },
+    {
+        "ParameterKey": "NewRelicRegion",
+        "ParameterValue": "US"
+    },
+    {
+        "ParameterKey": "NewRelicApmAppName",
+        "ParameterValue": "New Relic Entity Tag Sync Lambda"
+    },
+    {
+        "ParameterKey": "NewRelicApiKey",
+        "ParameterValue": "123456"
+    },
+    {
+        "ParameterKey": "SnowApiUrl",
+        "ParameterValue": "https://my-service-now.service-now.com"
+    },
+    {
+        "ParameterKey": "SnowApiAuthType",
+        "ParameterValue": "oauth"
+    },
+    {
+        "ParameterKey": "SnowApiUser",
+        "ParameterValue": "admin"
+    },
+    {
+        "ParameterKey": "SnowApiPassword",
+        "ParameterValue": "XXXXXX"
+    },
+    {
+        "ParameterKey": "SnowApiOAuthTokenUrl",
+        "ParameterValue": "https://my-service-now.service-now.com/oauth_token.do"
+    },
+    {
+        "ParameterKey": "SnowApiOAuthGrantType",
+        "ParameterValue": "client_credentials"
+    },
+    {
+        "ParameterKey": "SnowApiOAuthClientId",
+        "ParameterValue": "12345"
+    },
+    {
+        "ParameterKey": "SnowApiOAuthClientSecret",
+        "ParameterValue": "XXXXXX"
+    },
+    {
+        "ParameterKey": "SnowApiOAuthClientScopes",
+        "ParameterValue": "auth_scope_1 auth_scope_2"
+    },
+    {
+        "ParameterKey": "ScheduleExpression",
+        "ParameterValue": "cron(*/15 * * * ? *)"
+    }
+]
