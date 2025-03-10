@@ -1,19 +1,20 @@
 package interop
 
 import (
-  "context"
-  "fmt"
-  "os"
-  "time"
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
-  "github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrlogrus"
-  "github.com/newrelic/go-agent/v3/newrelic"
-  nrClient "github.com/newrelic/newrelic-client-go/newrelic"
-  "github.com/newrelic/newrelic-client-go/pkg/config"
-  "github.com/newrelic/newrelic-client-go/pkg/logging"
-  "github.com/newrelic/newrelic-client-go/pkg/region"
-  log "github.com/sirupsen/logrus"
-  "github.com/spf13/viper"
+	"github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrlogrus"
+	"github.com/newrelic/go-agent/v3/newrelic"
+	nrClient "github.com/newrelic/newrelic-client-go/newrelic"
+	"github.com/newrelic/newrelic-client-go/pkg/config"
+	"github.com/newrelic/newrelic-client-go/pkg/logging"
+	"github.com/newrelic/newrelic-client-go/pkg/region"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 type Interop struct {
@@ -31,6 +32,9 @@ func ConfigLicenseKey(licenseKey string) nrClient.ConfigOption {
 }
 
 func NewInteroperability() (*Interop, error) {
+  viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
   // Load configuration with viper
   viper.SetConfigName("config")
   viper.AddConfigPath("configs")

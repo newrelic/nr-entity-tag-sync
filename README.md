@@ -556,16 +556,16 @@ The ServiceNow CMDB provider supports the following configuration parmaeters.
 
 | Name | Environment Variable | Description | Required | Example | Default |
 | --- | --- | --- | --- | --- | --- |
-| `apiUrl` | `NR_CMDB_SNOW_APIURL` | The ServiceNow ReST API URL | Y | https://my-service-now.service-now.com | |
-| `authType` | `NR_CMDB_SNOW_AUTHTYPE` | The type of authentication to use to authenticate with the ServiceNow instance (`basic` or `oauth`) | Y | `basic` | `basic` |
-| `apiUser` | `NR_CMDB_SNOW_APIUSER` | The ServiceNow username to use when using `basic` authentication | Y if `authType` is `basic` | `admin` | |
-| `apiPassword` | `NR_CMDB_SNOW_APIPASSWORD` | The password to use for the specified ServiceNow username when using `basic` authentication | Y if `authType` is `basic` | `abcd123` | |
-| `oauthTokenUrl` | `NR_CMDB_SNOW_OAUTHTOKENURL` | The token URL to use when using `oauth` authentication | N | `https://myco.apis.com/auth` | `${apiUrl}/oauth_token.do` |
-| `oauthGrantType` | `NR_CMDB_SNOW_GRANTTYPE` | The grant type to use when using `oauth` authentication | N | `client_credentials` | `password` |
-| `oauthClientId` | `NR_CMDB_SNOW_OAUTHCLIENTID` | The client ID to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
-| `oauthClientSecret` | `NR_CMDB_SNOW_OAUTHCLIENTSECRET` | The client secret to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
-| `oauthClientScopes` | `NR_CMDB_SNOW_OAUTHCLIENTSCOPES` | The list of OAuth scopes to request when using `oauth` authentication. Separate multiple scopes using whitespace characters. | N | `read_profile` | |
-| `pageSize` | `NR_CMDB_SNOW_PAGESIZE` | A New Relic User API key | N | `10` | `10000` |
+| `apiUrl` | `NR_CMDB_SNOW_PROVIDER_APIURL` | The ServiceNow ReST API URL | Y | https://my-service-now.service-now.com | |
+| `authType` | `NR_CMDB_SNOW_PROVIDER_AUTHTYPE` | The type of authentication to use to authenticate with the ServiceNow instance (`basic` or `oauth`) | Y | `basic` | `basic` |
+| `apiUser` | `NR_CMDB_SNOW_PROVIDER_APIUSER` | The ServiceNow username to use when using `basic` authentication | Y if `authType` is `basic` | `admin` | |
+| `apiPassword` | `NR_CMDB_SNOW_PROVIDER_APIPASSWORD` | The password to use for the specified ServiceNow username when using `basic` authentication | Y if `authType` is `basic` | `abcd123` | |
+| `oauthTokenUrl` | `NR_CMDB_SNOW_PROVIDER_OAUTHTOKENURL` | The token URL to use when using `oauth` authentication | N | `https://myco.apis.com/auth` | `${apiUrl}/oauth_token.do` |
+| `oauthGrantType` | `NR_CMDB_SNOW_PROVIDER_GRANTTYPE` | The grant type to use when using `oauth` authentication | N | `client_credentials` | `password` |
+| `oauthClientId` | `NR_CMDB_SNOW_PROVIDER_OAUTHCLIENTID` | The client ID to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
+| `oauthClientSecret` | `NR_CMDB_SNOW_PROVIDER_OAUTHCLIENTSECRET` | The client secret to use when using `oauth` authentication | Y if `authType` is `oauth` | `12345` | |
+| `oauthClientScopes` | `NR_CMDB_SNOW_PROVIDER_OAUTHCLIENTSCOPES` | The list of OAuth scopes to request when using `oauth` authentication. Separate multiple scopes using whitespace characters. | N | `read_profile` | |
+| `pageSize` | `NR_CMDB_SNOW_PROVIDER_PAGESIZE` | A New Relic User API key | N | `10` | `10000` |
 
 #### Mapping parameters
 
@@ -888,8 +888,8 @@ mappings:
 1. The entity tag sync application starts up and reads in the configuration.
 1. A new ServiceNow provider is created with the API base URL
   `https://my-service-now.service-now.com` and the API username `admin`. The API
-   password will be read from the environment variable `NR_CMDB_SNOW_APIPASSWORD`.
-   The page size defaults to 10000.
+   password will be read from the environment variable
+   `NR_CMDB_SNOW_PROVIDER_APIPASSWORD`. The page size defaults to 10000.
 1. The application starts processing the first mapping configuration by
    inspecting the `extEntityQuery` node.
 1. Using the `type` parameter specified in the `extEntityQuery` node as the
