@@ -48,7 +48,6 @@ func init() {
 }
 
 func New(i *interop.Interop, v *viper.Viper) (provider.Provider, error) {
-	v.AutomaticEnv()
 	v.SetEnvPrefix("NR_CMDB_SNOW")
 
 	apiUrl := v.GetString("apiUrl")

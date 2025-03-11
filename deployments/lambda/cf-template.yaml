@@ -192,15 +192,15 @@ Resources:
           NEW_RELIC_API_KEY: !Ref NewRelicApiKey
 
           # Service Now variables
-          NR_CMDB_SNOW_APIURL: !Ref SnowApiUrl
-          NR_CMDB_SNOW_AUTHTYPE: !Ref SnowApiAuthType
-          NR_CMDB_SNOW_APIUSER: !Ref SnowApiUser
-          NR_CMDB_SNOW_APIPASSWORD: !Ref SnowApiPassword
-          NR_CMDB_SNOW_OAUTHTOKENURL: !Ref SnowApiOAuthTokenUrl
-          NR_CMDB_SNOW_OAUTHGRANTTYPE: !Ref SnowApiOAuthGrantType
-          NR_CMDB_SNOW_OAUTHCLIENTID: !Ref SnowApiOAuthClientId
-          NR_CMDB_SNOW_OAUTHCLIENTSECRET: !Ref SnowApiOAuthClientSecret
-          NR_CMDB_SNOW_OAUTHCLIENTSCOPES: !Ref SnowApiOAuthClientScopes
+          NR_CMDB_SNOW_PROVIDER_APIURL: !Ref SnowApiUrl
+          NR_CMDB_SNOW_PROVIDER_AUTHTYPE: !Ref SnowApiAuthType
+          NR_CMDB_SNOW_PROVIDER_APIUSER: !Ref SnowApiUser
+          NR_CMDB_SNOW_PROVIDER_APIPASSWORD: !Ref SnowApiPassword
+          NR_CMDB_SNOW_PROVIDER_OAUTHTOKENURL: !Ref SnowApiOAuthTokenUrl
+          NR_CMDB_SNOW_PROVIDER_OAUTHGRANTTYPE: !Ref SnowApiOAuthGrantType
+          NR_CMDB_SNOW_PROVIDER_OAUTHCLIENTID: !Ref SnowApiOAuthClientId
+          NR_CMDB_SNOW_PROVIDER_OAUTHCLIENTSECRET: !Ref SnowApiOAuthClientSecret
+          NR_CMDB_SNOW_PROVIDER_OAUTHCLIENTSCOPES: !Ref SnowApiOAuthClientScopes
 
   #
   # Execution role used by EventBridge to execute the Entity Tag Sync lambda.
