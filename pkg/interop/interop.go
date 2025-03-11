@@ -33,7 +33,7 @@ func ConfigLicenseKey(licenseKey string) nrClient.ConfigOption {
 
 func NewInteroperability() (*Interop, error) {
   viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+  viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
   // Load configuration with viper
   viper.SetConfigName("config")
